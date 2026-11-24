@@ -29,6 +29,7 @@ The old POC used `create_all` and had no migrations. Real multi-user data needs 
   - `make_session_factory(engine) -> sessionmaker[Session]`.
   - It creates the parent directory for a file-based SQLite URL.
 - `db/uow.py`: `UnitOfWork`, a context manager that yields a `Session`, commits on success and rolls back on exception. Services will receive a `Callable[[], UnitOfWork]`.
+  - **Layering:** `services` may not import `gtm_studio.db` (the contract forbids an upward import, and `TYPE_CHECKING` imports count). Create `services/ports.py` here with a `UnitOfWork` Protocol (a context manager; no sqlalchemy types in it) and a `UnitOfWorkFactory = Callable[[], UnitOfWork]` alias. `db/uow.py` implements it, and the app wires the real one in. S06 adds the repository ports to the same file. Services only ever see ports.
 - `db/models/__init__.py`: imports every model module so Alembic autogenerate sees it.
 - `db/models/app_meta.py`: an `AppMeta(key PK, value)` table, the first migrated table, used for an install ID.
 - Alembic:
@@ -37,14 +38,13 @@ The old POC used `create_all` and had no migrations. Real multi-user data needs 
   - `db/migrations/versions/0001_baseline.py`, which creates `app_meta` and inserts `install_id`.
 - `db/migrate.py`: `upgrade(settings, revision="head")`, `downgrade(settings, revision)` and `current(settings)`, using the Alembic command API with a programmatic Config. No subprocess.
 - `cli.py`: `gtm db upgrade`, `gtm db current`, `gtm db revision -m "msg" [--autogenerate]`.
-- `api/deps.py`: `get_session` (FastAPI dependency; one session per request, from `app.state.session_factory`).
-- `api/app.py`: builds the engine and session factory in the lifespan, from the passed settings.
-- `api/routes/health.py`: adds `"db": "ok" | "error"` using `SELECT 1`. Update the schema, then regenerate `frontend/openapi.json` and `schema.d.ts` (the S04 contract test will insist).
-- `tests/conftest.py`:
-  - `settings` fixture: `GTM_ENV=test`, with `db_url` pointing at a SQLite file in `tmp_path`;
-  - `migrated_engine`: runs `upgrade` to head;
+- `db/deps.py`: `get_session` (FastAPI dependency; one session per request, from `request.app.state.session_factory`). It lives in `db/`, not `api/`, because S06's `auth/deps.py` needs it and the layers contract forbids infrastructure from importing `api`. `api/deps.py` (created in S02, holds `get_settings`) re-exports it.
+- `api/app.py`: builds the engine and session factory **in the lifespan** (`create_app` itself stays IO-free, so `gtm openapi` and `app.openapi()` never touch the DB), from the passed settings.
+- `api/routes/health.py` and `api/schemas/health.py` (both exist since S02): add `db: Literal["ok", "error"]` to `HealthResponse`, filled by a `SELECT 1`. Update the schema, then regenerate `frontend/openapi.json` and `schema.d.ts` (the S04 contract test will insist). Update the S02 health test, which asserts the exact JSON.
+- `tests/conftest.py` already has (from S02) an autouse fixture that scrubs `GTM_*` and disables the `.env` file, a `settings` fixture (`env="test"`, `db_url` in `tmp_path`), `api_routes`, and a `client` fixture that enters the TestClient context so the lifespan runs. Add:
+  - `migrated_engine`: runs `upgrade` to head against `settings.db_url`;
   - `db_session`;
-  - `client`: a TestClient built with `create_app(settings)`.
+  - and make `client` depend on `migrated_engine` where a test needs the schema.
 - Tests:
   - `tests/service/test_db_engine.py`: WAL on, foreign keys on, UoW commit and rollback.
   - `tests/service/test_migrations.py`: upgrade head → downgrade base → upgrade head; the model metadata and the migrations agree (autogenerate diff is empty).

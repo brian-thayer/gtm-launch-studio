@@ -20,7 +20,7 @@ Users can see exactly which GTM framework the system follows. Approver roles bec
 
 ## Create / modify
 - **Backend:**
-  - `services/catalog.py`: `CatalogService(root, families, uow_factory, audit)`. Its `current` property returns the `Catalog`; `loaded_at` and `issues` are attributes.
+  - `services/catalog.py`: `CatalogService(source, uow_factory, audit)`. Its `current` property returns the `Catalog`; `loaded_at` and `issues` are attributes. **Layering:** `services` can't import `catalog/` (infrastructure sits above it), so add a `CatalogSource` Protocol to `services/ports.py` (`load() -> Catalog`, `validate(catalog) -> list[Issue]`, `version_hash() -> str`), implement it in `catalog/source.py` as `FileCatalogSource(root, families)` (wrapping `load_catalog`, `validate`, `catalog_version_hash`), and wire it in the lifespan. `Catalog` and `Issue` are pure domain types (`domain/catalog.py`).
     - `load_initial()` runs at startup. If validation finds **errors**, startup fails with a clear message listing them. Warnings are logged.
     - `reload(actor) -> ReloadResult(ok, old_hash, new_hash, issues)` validates first and swaps atomically only when there are no errors. It audits `catalog.reloaded` or `catalog.reload_rejected` with both hashes and the issue counts. Use a lock for the swap.
     - `sync_roles()` runs after every successful load:
@@ -64,7 +64,7 @@ Users can see exactly which GTM framework the system follows. Approver roles bec
     - Playwright: an admin opens the Catalog page and sees the version hash and the matrix; the reload succeeds; Activity shows `catalog.reloaded` with the admin's name.
 
 ## Acceptance criteria
-- [ ] Running with `GTM_CATALOG_DIR=../fixtures/demo/catalog` shows the demo catalog. The real `gtm_catalog/` shows the user's catalog once S11–S13 are done.
+- [ ] Running with `GTM_CATALOG_DIR=fixtures/demo/catalog` (relative to the repo root) shows the demo catalog. The real `gtm_catalog/` shows the user's catalog once S11–S13 are done.
 - [ ] The matrix is computed only in the backend. The frontend has no tier or gate logic.
 - [ ] A bad edit followed by Reload is rejected, the old catalog stays live, and the rejection is audited (test plus a manual check).
 - [ ] Catalog approver roles appear in `/api/auth/me` for the matching dev users after the sync.

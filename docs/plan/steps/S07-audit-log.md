@@ -27,7 +27,7 @@ Invariant 3, plus the production requirement for user activity logging. Every la
   - binds structlog contextvars (`request_id`, `path`, `method`);
   - adds `X-Request-ID` to the response;
   - logs one access line: `method`, `path`, `status`, `duration_ms`, `actor_id`.
-- `audit/logging.py`: `configure_logging(settings)`. structlog with JSON output when `env != "dev"` and the console renderer in dev. It routes stdlib logging (uvicorn) through structlog, and never logs request bodies.
+- `audit/logging.py`: `configure_logging(settings)`. structlog with JSON output when `env != "dev"` and the console renderer in dev. It routes stdlib logging (uvicorn) through structlog, and never logs request bodies. **Everything goes to stderr** (`structlog.PrintLoggerFactory(file=sys.stderr)` plus a stderr stdlib handler). structlog's default writes to stdout, which is where `gtm openapi > frontend/openapi.json` writes the schema, so a single stray log line would corrupt it. Today the `gtm worker` placeholder logs to stdout through that default. Call `configure_logging` from `cli.py`'s Typer callback (use `Settings.defaults()` for `openapi` so it stays environment-independent), and add a test that `gtm openapi` stdout still parses as JSON with logging configured.
 - `db/models/audit.py`: `AuditEvent` with these columns:
   - `id`, `occurred_at`;
   - `actor_user_id` (FK, nullable for system), `actor_display`;

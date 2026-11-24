@@ -36,4 +36,34 @@ Work proceeds through small **step cards** in `docs/plan/steps/`:
 - **Planning and milestone reviews:** an Opus session, running `/review-milestone M#`.
 - **Implementation:** a fresh Sonnet session per step (`claude --model sonnet`), running `/implement-step S##`.
 
-Commands to run the app appear here once the scaffold steps (S02–S04) land.
+## Backend quick start
+
+Needs Python 3.12 and [`uv`](https://docs.astral.sh/uv/). Install `uv` once with `py -m pip install --user uv`, and make sure `%APPDATA%\Python\Python312\Scripts` is on your PATH.
+
+```bash
+cd backend
+uv sync                                   # creates backend/.venv and installs everything
+uv run pytest                             # tests (Bedrock tests are excluded)
+uv run ruff check . && uv run ruff format --check .
+uv run pyright                            # types (strict for domain/ and services/)
+uv run lint-imports                       # layering contracts
+uv run uvicorn gtm_studio.api.app:create_app --factory --reload --port 8000
+# then open http://127.0.0.1:8000/api/health and http://127.0.0.1:8000/api/docs
+uv run gtm --help                         # version, openapi, worker
+```
+
+Configuration comes from `GTM_*` environment variables, or from a git-ignored `backend/.env`. Every setting is optional:
+
+| Variable | Default | Meaning |
+|---|---|---|
+| `GTM_ENV` | `dev` | `dev`, `test` or `production`. Production turns off the interactive API docs. |
+| `GTM_DB_URL` | `sqlite:///<repo>/storage/gtm_studio.db` | SQLAlchemy URL. A relative SQLite path resolves against the repo root. |
+| `GTM_STORAGE_DIR` | `<repo>/storage` | Local runtime data. |
+| `GTM_CATALOG_DIR` | `<repo>/gtm_catalog` | The GTM framework as data. |
+| `GTM_CONFIG_DIR` | `<repo>/config` | App configuration (dev users, model routes, pricing). |
+| `GTM_LLM_PROVIDER` | `mock` | `mock` or `bedrock`. |
+| `GTM_ALLOW_BEDROCK` | `false` | Bedrock calls cost money. Leave off unless you have decided to run them. |
+| `GTM_AWS_REGION` | unset | Region for Bedrock. |
+| `GTM_LOG_LEVEL` | `INFO` | `DEBUG`, `INFO`, `WARNING`, `ERROR` or `CRITICAL`. |
+
+The frontend and the one-command dev runner arrive in S03 and S04.

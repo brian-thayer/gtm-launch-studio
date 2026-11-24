@@ -17,7 +17,7 @@ It moves the hosted, multi-user deployment from a rewrite to an app registration
 - `backend/src/gtm_studio/auth/providers.py`, `auth/deps.py`, `api/routes/auth.py`, `services/identity.py`, `audit/sql_audit_log.py`, `settings.py`
 
 ## Create / modify
-- Dependencies: `authlib`. Its Starlette client needs `httpx`, so move `httpx` from the dev group to runtime.
+- Dependencies: `authlib`. Its Starlette client needs `httpx`, so add `httpx` as a **runtime** dependency. (Since S02 the dev group holds `httpx2` for Starlette's `TestClient`, not `httpx`; the two can coexist. Check which one `authlib` imports and keep only what's needed.) Never import it from `domain/` or `services/`.
 - `settings.py`:
   - `oidc_issuer`, `oidc_client_id`, `oidc_client_secret: SecretStr | None`;
   - `oidc_scopes = "openid email profile"`, `oidc_redirect_url`;
