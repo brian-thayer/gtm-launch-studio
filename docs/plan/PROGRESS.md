@@ -32,3 +32,21 @@ Newest entries go at the bottom. Each step appends one entry: what was built, an
 - Review: `code-reviewer` PASS WITH NITS, nothing blocking. The dependency floors were raised afterwards (`fastapi>=0.165`, `httpx2>=2.16`).
 - Follow-ups: driver-qualified SQLite URLs (S05); stderr logging (S07); create `backend/.env.example` (before S10); put `%APPDATA%\Python\Python312\Scripts` on the Windows user PATH so the format and stop-test hooks run.
 - Verification (from `backend/`): `uv sync` OK · `uv run pytest` 40 passed · `ruff check` clean · `ruff format --check` 27 files formatted · `pyright` 0 errors · `lint-imports` 3 contracts kept · `gtm openapi` contains `/api/health`.
+
+## S03 Frontend scaffold (2026-11-24, Sonnet)
+- Built:
+  - `frontend/` Vite 8 + React 19 + strict TypeScript app (solution-style tsconfig, `noUncheckedIndexedAccess`, `@/` alias), with ESLint 10 flat config and Prettier;
+  - code-based TanStack Router route tree (root layout plus `/`) and a TanStack Query provider in `src/main.tsx`;
+  - Tailwind 4 with a neutral CSS-variable theme, `cn()`, and shadcn `button`, `card` and `badge` added through the shadcn CLI;
+  - `AppLayout` (skip link, header, main landmark) and `HomePage` (title plus placeholder card);
+  - Vitest with jsdom and Testing Library (2 tests), and a Playwright smoke test on the installed Edge (`channel: "msedge"`, no browser download);
+  - `frontend/CLAUDE.md` gained a Conventions section.
+- Deviations (full detail in the card's Notes):
+  - TypeScript is pinned to `~5.9.3`: `typescript-eslint` and `openapi-typescript` reject 6 and 7;
+  - extra dependencies `@types/node` (dev) and `radix-ui` (added by the shadcn CLI);
+  - the shadcn CLI could not resolve the `@` alias: files were written to a literal `frontend/@/` folder with `from "cn"` imports, plus a stray `cn` package. I moved and fixed the files, removed `cn`, and added `paths` to the root `tsconfig.json`;
+  - no `frontend/.gitignore` (the root one covers it);
+  - the react-refresh rule is off for `src/components/ui/**`, and Vitest `include` is limited to `src/**/*.test.{ts,tsx}`.
+- Review: `code-reviewer` PASS WITH NITS, nothing blocking. The one real nit (the unused `cn` package) is fixed. The weak `getByText("Workspace")` assertion is left as is for a scaffold.
+- Follow-ups: S04 adds the `/api` proxy and `src/api/`; S39 decides the dark palette; consider type-aware ESLint once there is feature code.
+- Verification (from `frontend/`): `npm install` OK, 0 vulnerabilities · `npm run lint` clean · `npm run typecheck` clean · `npm run test` 2 passed · `npm run build` produced `dist/` · `npm run e2e` 1 passed (msedge) · `npx prettier --check .` clean. Everything was re-run after removing `cn`.

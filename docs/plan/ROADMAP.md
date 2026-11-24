@@ -17,7 +17,7 @@ Status values: `todo` · `in progress` · `done` · `blocked`. **Human** marks s
 | Step | Title | Status | Depends on | Human |
 |---|---|---|---|---|
 | S02 | Backend scaffold (uv, FastAPI, settings, CLI, quality gates) | done | S01 | approve the `uv` install |
-| S03 | Frontend scaffold (Vite React TS, Tailwind/shadcn, Router/Query, tests) | todo | S02 | approve `npm install` |
+| S03 | Frontend scaffold (Vite React TS, Tailwind/shadcn, Router/Query, tests) | done | S02 | approve `npm install` |
 | S04 | Dev runner, Vite proxy, OpenAPI → TS client loop | todo | S02, S03 | |
 | S05 | Database foundation (SQLAlchemy 2, Alembic, SQLite WAL, test fixtures) | todo | S04 | |
 | S06 | Users, roles, permissions, dev login, sessions | todo | S05 | |
