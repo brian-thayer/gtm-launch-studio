@@ -65,5 +65,32 @@ Configuration comes from `GTM_*` environment variables, or from a git-ignored `b
 | `GTM_ALLOW_BEDROCK` | `false` | Bedrock calls cost money. Leave off unless you have decided to run them. |
 | `GTM_AWS_REGION` | unset | Region for Bedrock. |
 | `GTM_LOG_LEVEL` | `INFO` | `DEBUG`, `INFO`, `WARNING`, `ERROR` or `CRITICAL`. |
+| `GTM_CORS_ORIGINS` | empty | Comma-separated browser origins allowed to call the API cross-origin. Normally unset: the Vite proxy keeps everything same-origin. `*` is rejected. |
 
-The frontend and the one-command dev runner arrive in S03 and S04.
+## Frontend quick start
+
+Needs Node 24.
+
+```bash
+cd frontend
+npm install
+npm run dev                  # http://localhost:5173, proxies /api to the API on 127.0.0.1:8000
+npm run lint && npm run typecheck && npm run test
+npm run e2e                  # Playwright on the installed Edge; starts the API and Vite itself
+```
+
+The frontend talks to the backend only through a client generated from the API's OpenAPI schema. After you add or change an endpoint, regenerate it and commit the results (a backend test fails if you forget):
+
+```bash
+cd backend && uv run gtm openapi > ../frontend/openapi.json
+cd ../frontend && npm run gen:api       # writes src/api/schema.d.ts
+```
+
+## Run everything (Windows)
+
+```powershell
+powershell -File scripts/dev.ps1          # API, worker and web, each in its own window
+powershell -File scripts/dev.ps1 -Stop    # stop them
+```
+
+It refuses to start if ports 8000 or 5173 are in use, waits until the frontend can reach the API, then prints the URLs. The home page shows an "API: ok" badge when the whole chain works. `uv` doesn't have to be on PATH: the script finds it in `%APPDATA%\Python\Python3*\Scripts`.

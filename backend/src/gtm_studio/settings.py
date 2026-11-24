@@ -6,10 +6,10 @@ they need.
 """
 
 from pathlib import Path
-from typing import Literal, Self
+from typing import Annotated, Literal, Self
 
 from pydantic import field_validator
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 # backend/src/gtm_studio/settings.py -> parents[3] is the repository root.
 REPO_ROOT = Path(__file__).resolve().parents[3]
@@ -40,6 +40,10 @@ class Settings(BaseSettings):
     allow_bedrock: bool = False
     aws_region: str | None = None
     log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"] = "INFO"
+    # Browser origins allowed to call the API cross-origin. Empty (the default) adds no CORS middleware:
+    # the Vite dev proxy and a same-origin deployment don't need it. Set as a comma-separated list.
+    # NoDecode: pydantic-settings would otherwise insist on a JSON array for a list field.
+    cors_origins: Annotated[list[str], NoDecode] = []
 
     @classmethod
     def defaults(cls) -> Self:
@@ -67,6 +71,22 @@ class Settings(BaseSettings):
         if not target or target.startswith((":", "/")) or Path(target).is_absolute():
             return value
         return f"{_SQLITE_PREFIX}{_resolve_path(Path(target)).as_posix()}"
+
+    @field_validator("cors_origins", mode="before")
+    @classmethod
+    def _split_cors_origins(cls, value: object) -> object:
+        """Accept 'https://a.example, https://b.example' (and a list). Blank entries are dropped."""
+        if isinstance(value, str):
+            return [origin.strip() for origin in value.split(",") if origin.strip()]
+        return value
+
+    @field_validator("cors_origins")
+    @classmethod
+    def _no_wildcard_origin(cls, value: list[str]) -> list[str]:
+        """The session cookie is sent cross-origin, so a wildcard origin would let any site use it."""
+        if "*" in value:
+            raise ValueError("cors_origins must list explicit origins, not '*'")
+        return value
 
     @field_validator("log_level", mode="before")
     @classmethod

@@ -9,6 +9,7 @@ Rules that keep the generated OpenAPI contract stable (see ``api/openapi.py``):
 """
 
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.routing import APIRoute
 
 from gtm_studio import __version__
@@ -37,5 +38,15 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         generate_unique_id_function=_operation_id,
     )
     app.state.settings = settings
+    if settings.cors_origins:
+        # Off by default: the Vite proxy makes the browser see one origin. Middleware adds no routes, so
+        # this keeps the OpenAPI schema independent of settings.
+        app.add_middleware(
+            CORSMiddleware,
+            allow_origins=settings.cors_origins,
+            allow_credentials=True,  # the session cookie (S06)
+            allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE"],
+            allow_headers=["Content-Type", "X-Requested-With"],
+        )
     app.include_router(health.router, prefix=API_PREFIX)
     return app

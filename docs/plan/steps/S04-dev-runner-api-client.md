@@ -1,6 +1,6 @@
 # S04: Dev runner, Vite proxy, OpenAPI → TypeScript client loop
 
-Status: todo
+Status: done
 Milestone: M1
 Depends on: S02, S03
 Human in the loop: no
@@ -59,3 +59,11 @@ powershell -File ../scripts/dev.ps1 ; powershell -File ../scripts/dev.ps1 -Stop 
 - Auth cookies and the CSRF check on the server (S06). The client sends the header now; the server starts enforcing it in S06.
 
 ## Notes
+- **Drift check done.** I appended a throwaway `GET /api/health/drift-probe` route to `health.py` without regenerating. `test_openapi_contract.py` failed with the "Run `uv run gtm openapi ...` then `npm run gen:api`" message. I reverted the route and the test passed again.
+- **Contract test path.** It reads `REPO_ROOT / "frontend" / "openapi.json"` (from `Settings`) instead of the card's cwd-relative `../frontend/openapi.json`, so it passes from any working directory.
+- **`dev.ps1` refuses to start when 8000 or 5173 is busy** (the card says "warns"). Starting anyway would open windows that die at once (Vite has `strictPort`). It names the owning process and says to run `-Stop`. The worker has no port, so `-Stop` also needs `storage/dev-pids.json` (window PIDs plus start times, to survive PID reuse). The script also finds `uv` under `%APPDATA%\Python\Python3*\Scripts` when it isn't on PATH, and waits until `http://localhost:5173/api/health` answers (which proves the proxy) before printing the URLs.
+- **Playwright starts the API from `backend/.venv`** (`python -m uvicorn ...`), not `uv run`, so `npm run e2e` works when `uv` isn't on PATH. It needs a one-time `uv sync`. Both servers are reused if already running (except under `CI`).
+- **`GTM_CORS_ORIGINS`** is parsed as a comma-separated list (`NoDecode`, otherwise pydantic-settings wants JSON) and rejects `*`, because the CORS middleware allows credentials. Unverified: `$Host.UI.RawUI.WindowTitle` sets the `gtm-*` window titles, but under Windows Terminal I couldn't read them back (`MainWindowTitle` is empty because the terminal owns the window).
+- **Bug found and fixed while testing `-Stop`:** Windows PowerShell 5.1's `ConvertFrom-Json` returns a JSON array as one object, so the pid-file path failed and only the port sweep ran (the worker, which has no port, survived). The script now pipes the result through `ForEach-Object` to unroll it. After the fix, start, a second start (refused), and `-Stop` all behave, and ports 8000 and 5173 are free afterwards.
+- Reviewer (`code-reviewer`): PASS WITH NITS, nothing blocking. It could not run `dev.ps1` itself (it opens windows); I ran the full start/stop cycle. The `git status` noise on about 16 untouched frontend files is autocrlf stat churn after `prettier --write` (`git diff HEAD --stat` shows only the intended files).
+- Follow-up for S06: the server must start enforcing `X-Requested-With` on state-changing requests (the client already sends it).

@@ -50,3 +50,20 @@ Newest entries go at the bottom. Each step appends one entry: what was built, an
 - Review: `code-reviewer` PASS WITH NITS, nothing blocking. The one real nit (the unused `cn` package) is fixed. The weak `getByText("Workspace")` assertion is left as is for a scaffold.
 - Follow-ups: S04 adds the `/api` proxy and `src/api/`; S39 decides the dark palette; consider type-aware ESLint once there is feature code.
 - Verification (from `frontend/`): `npm install` OK, 0 vulnerabilities · `npm run lint` clean · `npm run typecheck` clean · `npm run test` 2 passed · `npm run build` produced `dist/` · `npm run e2e` 1 passed (msedge) · `npx prettier --check .` clean. Everything was re-run after removing `cn`.
+
+## S04 Dev runner, Vite proxy, OpenAPI → TS client loop (2026-11-24, Sonnet)
+- Built:
+  - contract-first loop: `frontend/openapi.json` (from `gtm openapi`) and `src/api/schema.d.ts` (from `npm run gen:api`) are committed, and `backend/tests/api/test_openapi_contract.py` fails when they drift from `create_app(Settings.defaults())`. `.gitattributes` keeps both LF;
+  - `src/api/client.ts`: the shared `api` client (`openapi-fetch`), a middleware that sends `X-Requested-With: gtm-studio` plus credentials, `ApiError`, `isApiError` and `unwrap`; `createApiClient` is exported so tests can inject a fake `fetch`;
+  - `useHealth` hook and an "API: checking / ok / unreachable" badge on `HomePage`;
+  - Vite proxies `/api` to `127.0.0.1:8000`; `GTM_CORS_ORIGINS` (comma-separated, no `*`) optionally adds CORS middleware without changing the OpenAPI schema;
+  - `scripts/dev.ps1` (start the API, worker and web windows, wait until the proxy reaches the API, print URLs) and `-Stop`; Playwright now starts the API (from `backend/.venv`) and Vite itself, and the smoke spec asserts "API: ok".
+- Deviations (full detail in the card's Notes):
+  - `dev.ps1` refuses to start when 8000 or 5173 is busy, instead of only warning;
+  - the contract test resolves the schema path from `REPO_ROOT`, not the working directory;
+  - Playwright runs `backend/.venv`'s Python rather than `uv run`, so `uv` need not be on PATH;
+  - `-Stop` also uses a pid file (`storage/dev-pids.json`), because the worker has no port.
+- Found and fixed: Windows PowerShell 5.1's `ConvertFrom-Json` doesn't unroll arrays, which broke the pid-file stop path.
+- Review: `code-reviewer` PASS WITH NITS, nothing blocking. It could not run `dev.ps1`; I ran start, a refused second start, and `-Stop` by hand, and the ports were free afterwards. Drift check done (a probe route made the contract test fail, then reverted).
+- Follow-ups: S06 must enforce `X-Requested-With` on state-changing requests; the `gtm-*` window titles are set but I couldn't read them back under Windows Terminal; run `/fewer-permission-prompts` after M1.
+- Verification: `uv run pytest` 50 passed · `ruff check` clean · `ruff format --check` 28 files formatted · `pyright` 0 errors · `lint-imports` 3 contracts kept · `npm run lint` clean · `npm run typecheck` clean · `npm run test` 13 passed (2 files) · `npx prettier --check .` clean · `npm run e2e` 2 passed (Playwright started both servers) · `dev.ps1` start/`-Stop` verified by hand · `gtm openapi` output identical to `frontend/openapi.json`.

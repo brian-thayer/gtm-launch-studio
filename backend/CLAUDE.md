@@ -24,6 +24,8 @@
 - Every router sets `tags`: operation IDs are `<tag>_<function name>`, and they end up in the generated TypeScript client.
 - **The OpenAPI schema never depends on settings.** Mount every route unconditionally and decide inside the handler (a disabled feature answers 404). `gtm openapi` builds the app from `Settings.defaults()`, and the contract test compares its output to `frontend/openapi.json`. Use `gtm_studio.api.openapi.render_openapi` for any serialization.
 - Everything is under `/api`, including the interactive docs (`/api/docs`, off when `GTM_ENV=production`).
+- CORS is off by default: the Vite proxy makes the browser see one origin. `GTM_CORS_ORIGINS` (comma-separated, explicit origins, no `*`) adds the middleware. Middleware adds no routes, so it is the one thing that may depend on settings without breaking the OpenAPI rule above.
+- Add or change an endpoint → regenerate `frontend/openapi.json` and `frontend/src/api/schema.d.ts` in the same change (`tests/api/test_openapi_contract.py` fails otherwise, and says how).
 - To list or audit routes, use `gtm_studio.api.introspection.list_routes` (or the `api_routes` fixture). FastAPI 0.165 keeps `include_router` results as lazy wrappers, so `app.routes` is not flat and its `path` values lack the prefix.
 - Never call `create_app` with side effects: DB, catalog and other IO belong in the lifespan, so `create_app` stays cheap and `app.openapi()` works without them.
 - stdout belongs to command output (`gtm openapi > file`). Logs go to stderr.

@@ -47,3 +47,36 @@ def test_interactive_docs_are_off_in_production(settings: Settings) -> None:
         assert client.get("/api/docs").status_code == 404
         assert client.get("/api/openapi.json").status_code == 404
         assert client.get("/api/health").status_code == 200
+
+
+_ORIGIN = "http://localhost:5173"
+_PREFLIGHT = {
+    "Origin": _ORIGIN,
+    "Access-Control-Request-Method": "GET",
+    "Access-Control-Request-Headers": "x-requested-with",
+}
+
+
+def test_cors_is_off_by_default(client: TestClient) -> None:
+    response = client.options("/api/health", headers=_PREFLIGHT)
+    assert "access-control-allow-origin" not in response.headers
+    assert "access-control-allow-origin" not in client.get("/api/health", headers={"Origin": _ORIGIN}).headers
+
+
+def test_cors_allows_only_the_configured_origins(settings: Settings) -> None:
+    cors = settings.model_copy(update={"cors_origins": [_ORIGIN]})
+    with TestClient(create_app(cors)) as client:
+        preflight = client.options("/api/health", headers=_PREFLIGHT)
+        assert preflight.status_code == 200
+        assert preflight.headers["access-control-allow-origin"] == _ORIGIN
+        assert preflight.headers["access-control-allow-credentials"] == "true"
+        assert "x-requested-with" in preflight.headers["access-control-allow-headers"].lower()
+
+        other = client.get("/api/health", headers={"Origin": "https://evil.example"})
+        assert "access-control-allow-origin" not in other.headers
+
+
+def test_cors_does_not_change_the_openapi_schema(settings: Settings) -> None:
+    """The schema never depends on settings: middleware must not add routes or parameters."""
+    cors = settings.model_copy(update={"cors_origins": [_ORIGIN]})
+    assert create_app(cors).openapi() == create_app(settings).openapi()

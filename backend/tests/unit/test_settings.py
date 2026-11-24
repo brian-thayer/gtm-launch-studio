@@ -138,3 +138,31 @@ def test_no_caching_between_instances(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("GTM_ENV", "production")
     second = Settings()
     assert (first.env, second.env) == ("test", "production")
+
+
+def test_cors_origins_default_to_empty() -> None:
+    assert Settings().cors_origins == []
+    assert Settings.defaults().cors_origins == []
+
+
+@pytest.mark.parametrize(
+    ("raw", "expected"),
+    [
+        ("https://a.example", ["https://a.example"]),
+        ("https://a.example,https://b.example", ["https://a.example", "https://b.example"]),
+        (" https://a.example , ,https://b.example, ", ["https://a.example", "https://b.example"]),
+        ("", []),
+    ],
+)
+def test_cors_origins_is_a_comma_separated_env_var(
+    monkeypatch: pytest.MonkeyPatch, raw: str, expected: list[str]
+) -> None:
+    monkeypatch.setenv("GTM_CORS_ORIGINS", raw)
+    assert Settings().cors_origins == expected
+
+
+def test_cors_origins_rejects_a_wildcard(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Credentials are allowed cross-origin, so a wildcard would let any site ride the session cookie."""
+    monkeypatch.setenv("GTM_CORS_ORIGINS", "https://a.example,*")
+    with pytest.raises(ValidationError):
+        Settings()

@@ -1,0 +1,4 @@
+# Generated API contract files must be byte-stable on Windows, or the OpenAPI contract test
+# (backend/tests/api/test_openapi_contract.py) and `npm run gen:api` churn on every checkout.
+*.json text eol=lf
+*.d.ts text eol=lf
