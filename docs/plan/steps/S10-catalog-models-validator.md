@@ -62,7 +62,7 @@ The catalog is how the user "teaches" the system their GTM framework. Every plan
   - Ignores `sources/`, `CLAUDE.md` and dotfiles.
   - Raises `CatalogLoadError(path, message)` with the file path on parse or schema errors.
 - `catalog/hashing.py`: `catalog_version_hash(root) -> str`, the first 12 hex characters of a sha256 over sorted `(relative posix path, file bytes)` for every loaded file, excluding `sources/` and `CLAUDE.md`.
-- `catalog/validate.py`: `validate(catalog, *, families: set[str], strict=False) -> list[Issue]`, where `Issue(level: "error"|"warning", where, message)`.
+- `catalog/validate.py`: `validate(catalog, *, families: set[str], strict=False) -> list[Issue]`, where `Issue(level: "error"|"warning", where, message)`. **Define `Issue` in `domain/catalog.py`** and import it here: `catalog/` is infrastructure, and S15's `CatalogService` (in `services/`) must be able to name `Issue` without importing `catalog/`.
   - **Errors:**
     - duplicate keys;
     - non-unique gate `order`;
@@ -88,7 +88,7 @@ The catalog is how the user "teaches" the system their GTM framework. Every plan
 - `cli.py`:
   - `gtm catalog validate [--path PATH] [--strict]` prints a table of issues, exits 1 on errors, and prints the version hash.
   - `gtm catalog show [--path]` prints a summary: gates, tiers, and the tier × gate asset-count matrix.
-- `settings.py`: `catalog_dir` already exists. Document in `backend/.env.example`: `GTM_CATALOG_DIR=../fixtures/demo/catalog` for the demo; the default `../gtm_catalog` is the real one.
+- `settings.py`: `catalog_dir` already exists. Relative paths resolve against the **repo root** (not the working directory), so the demo catalog is `GTM_CATALOG_DIR=fixtures/demo/catalog` and the default `gtm_catalog` is the real one (no `../`). Document it in the README's backend configuration table. `backend/.env.example` could not be created in S02 because a permission rule blocks `.env*` writes; add the line there only if the user has created that file or lifted the rule.
 - `backend/tests/fixtures/catalog_min/`: a tiny valid catalog with 2 gates, 2 tiers, 3 context keys, 3 asset types (one with `foundation` and `decides: tier`), one gold example, and minimal brand files.
 - `fixtures/demo/catalog/`: the **demo catalog**, converted from the old POC. Put `# DEMO ONLY: synthetic, not the company's real GTM framework` at the top of every YAML and Markdown file.
   - All 8 old gates and roles.

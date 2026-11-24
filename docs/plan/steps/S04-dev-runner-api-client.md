@@ -27,8 +27,10 @@ It locks in the contract-first loop that keeps Sonnet from hand-writing mismatch
   - typed error helpers.
 - `frontend/src/hooks/useHealth.ts`: TanStack Query hook for `GET /api/health`.
 - `frontend/src/pages/HomePage.tsx`: shows an "API: ok / unreachable" badge.
-- `backend/src/gtm_studio/api/app.py`: optional CORS middleware, only when `GTM_CORS_ORIGINS` is set (comma-separated). It is off by default because the proxy is the norm. Add `cors_origins: list[str] = []` to Settings.
-- `backend/tests/api/test_openapi_contract.py`: asserts that `create_app().openapi()` JSON equals the committed `frontend/openapi.json` (same serialization as `gtm openapi`). On failure the message says: "Run `uv run gtm openapi > ../frontend/openapi.json` then `npm run gen:api`."
+- `backend/src/gtm_studio/api/app.py`: optional CORS middleware, only when `GTM_CORS_ORIGINS` is set (comma-separated). It is off by default because the proxy is the norm. Add `cors_origins: list[str] = []` to Settings. Middleware doesn't change the OpenAPI schema, so this respects the "schema never depends on settings" rule (see `backend/CLAUDE.md`).
+- Since S02 the interactive docs are at `/api/docs` and `/api/openapi.json` (off in production), so the Vite `/api` proxy already covers them.
+- `backend/tests/api/test_openapi_contract.py`: asserts that `render_openapi(create_app(Settings.defaults()))` (from `gtm_studio.api.openapi`, the same function `gtm openapi` uses; S02) equals `Path("../frontend/openapi.json").read_text()`. `read_text` normalizes CRLF, which matters if git's autocrlf rewrites the file on checkout. On failure the message says: "Run `uv run gtm openapi > ../frontend/openapi.json` then `npm run gen:api`."
+- `.gitattributes` at the repo root: `*.json text eol=lf` and `*.d.ts text eol=lf`, so the generated files are byte-stable on Windows.
 - `scripts/dev.ps1`:
   - `-Stop` switch: kills whatever listens on ports 8000 and 5173, via `Get-NetTCPConnection` and `Stop-Process` on the owning process tree.
   - By default it:

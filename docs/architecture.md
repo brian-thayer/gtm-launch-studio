@@ -11,14 +11,15 @@ Context in ──► Facts / Snapshots ──► Planner ──► Jobs ──�
 ```
 
 ## Layers (`backend/src/gtm_studio/`)
-| Layer | May import | Must not import |
+| Layer (high to low) | May import | Must not import |
 |---|---|---|
-| `domain` | stdlib, pydantic | sqlalchemy, fastapi, anthropic, boto3, any adapter, file IO |
-| `services` | domain, the port protocols | fastapi, concrete adapters (they're injected) |
-| `adapters`, `db` | domain, services' port definitions, third-party libraries | api |
-| `api`, `worker`, `cli` | everything; they wire adapters into services | — |
+| `cli` | everything | — |
+| `api`, `worker` | everything below; they wire adapters into services | each other |
+| infrastructure: `adapters`, `db`, `auth`, `audit`, `catalog` | each other, `services` (port definitions), `domain`, third-party libraries | `api`, `worker`, `cli` |
+| `services` | `domain`, the port protocols | fastapi, starlette, anthropic, boto3, concrete adapters (they're injected) |
+| `domain` | stdlib, pydantic | sqlalchemy, fastapi, starlette, anthropic, boto3, httpx, `gtm_studio.settings`, any adapter, file IO |
 
-The layering rules are enforced by `import-linter` contracts in `backend/pyproject.toml`.
+The layering rules are enforced by three `import-linter` contracts in `backend/pyproject.toml` (`uv run lint-imports`). The infrastructure packages form one layer on purpose: `audit` writes `db` models and `auth` binds the actor into `audit.context`, so they must be able to import one another. `gtm_studio.settings` sits outside the layers; only `domain` is forbidden from importing it.
 
 ## Ports (protocols defined by services)
 `Repositories` (per aggregate) · `LLMClient` · `JobQueue` · `BlobStore` · `AuditLog` · `AhaSource` · `KnowledgeSource` · `DocumentExtractor` · `Renderer` (per format and family) · `TTSProvider` · `Clock` · `AuthProvider`

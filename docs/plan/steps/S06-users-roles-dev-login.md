@@ -34,7 +34,7 @@ Invariants 3 and 4: every action is attributed to a real person, and only people
   - `Role`: `key` (PK), `label`, `source` (`system` | `dev_seed` | `catalog` | `oidc`), `active`.
   - `UserRole`: `user_id` and `role_key` (composite PK), `granted_by_user_id` (nullable), `granted_at`, `source`.
 - Migration `0002_identity.py`: the three tables, plus seed rows for the system roles `admin` and `viewer`.
-- `services/ports.py`: an `IdentityRepository` protocol (get by ID, by email, by subject; list active users; upsert user; set roles).
+- `services/ports.py` (created in S05 with the `UnitOfWork` protocol): add an `IdentityRepository` protocol (get by ID, by email, by subject; list active users; upsert user; set roles). Services import only these ports, never `gtm_studio.db`.
 - `db/repositories/identity.py`: the SQLAlchemy implementation.
 - `services/identity.py`: `IdentityService`:
   - `seed_dev_users(path)`: idempotent. It creates missing roles with `source=dev_seed` and returns a summary.
@@ -48,7 +48,7 @@ Invariants 3 and 4: every action is attributed to a real person, and only people
 - `auth/providers.py`:
   - `AuthProvider` protocol: `name`, plus `login_options() -> dict` for the login page.
   - `DevAuthProvider(identity_service)`.
-- `auth/deps.py`:
+- `auth/deps.py` (layering: `auth` may not import `api`, so use `db.deps.get_session` from S05, and read `request.app.state.settings` directly if it needs settings, instead of `api.deps.get_settings`):
   - `current_actor` (dependency): 401 if there's no session or the user is inactive.
   - `require(*perms)`: a dependency factory that returns 403.
   - `optional_actor`.
@@ -62,7 +62,8 @@ Invariants 3 and 4: every action is attributed to a real person, and only people
 - `settings.py`:
   - `session_secret: SecretStr`, with a dev default that logs a warning;
   - `auth_provider: Literal["dev", "oidc"] = "dev"`;
-  - validators: in `production`, `auth_provider` must not be `dev` and `session_secret` must not be the default.
+  - validators: in `production`, `auth_provider` must not be `dev` and `session_secret` must not be the default. Write them as a `model_validator(mode="after")` and test them with `Settings(env="production", ...)`. `Settings.defaults()` (used by `gtm openapi`) uses `model_construct`, so it skips validators on purpose; it is always `env="dev"`. Give every new field a default so it works.
+  - the routes stay mounted whatever `auth_provider` is (dev login answers 404 when it isn't `dev`), so the OpenAPI schema doesn't vary with settings.
 - `cli.py`: `gtm seed dev-users [--path config/dev_users.yaml]`.
 - `tests/conftest.py`:
   - a `seeded` fixture (migrates and seeds dev users);
@@ -80,7 +81,7 @@ Invariants 3 and 4: every action is attributed to a real person, and only people
 - Regenerate `frontend/openapi.json` and `schema.d.ts`.
 
 ## Acceptance criteria
-- [ ] Except `/api/health`, `/api/auth/options` and `/api/auth/dev/login`, every route needs a session. A test enumerates the app's routes and asserts each non-allowlisted one has a `current_actor` or `require` dependency. This test stays forever as a guard.
+- [ ] Except `/api/health`, `/api/auth/options` and `/api/auth/dev/login`, every route needs a session. A test enumerates the app's routes and asserts each non-allowlisted one has a `current_actor` or `require` dependency. This test stays forever as a guard. **Enumerate with the `api_routes` fixture** (`gtm_studio.api.introspection.list_routes`, from S02), not `app.routes`: FastAPI 0.165 keeps included routers as lazy wrappers, so `app.routes` holds no `APIRoute` for them. Entries whose `route` is `None` are the plain Starlette interactive-docs routes (`/api/docs`, `/api/openapi.json`; absent in production), and are exempt.
 - [ ] The session cookie is httpOnly, `SameSite=Lax`, and `Secure` in production.
 - [ ] `can_approve` lives in `domain` and is pure. Admin without an approver role gets `False`.
 - [ ] Dev login can't be enabled when `GTM_ENV=production` (settings validation error).

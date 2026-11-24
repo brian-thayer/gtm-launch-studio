@@ -54,7 +54,7 @@ Commands exist once the step that adds them is done (see ROADMAP). Run backend c
 
 ## Environment (Windows 11, Git Bash)
 - Every Bash call prints about 12 lines of harmless `/etc/mtab ... Permission denied` noise. Ignore it.
-- Python 3.12 and Node 24 are installed. `uv` may need installing in S02; ask the user first.
+- Python 3.12 and Node 24 are installed. `uv` was installed in S02 with `py -m pip install --user uv`. Its folder is not on Git Bash's PATH by default. If you see `uv: command not found`, run `export PATH="$PATH:$(cygpath "$APPDATA")/Python/Python312/Scripts"` first. Until that folder is on the Windows user PATH, the format and stop-test hooks skip quietly (they look up `uv` with `shutil.which`).
 - Headless Microsoft Edge is the browser for PDF rendering and Playwright (`channel: "msedge"`). Don't download Chromium.
 - SAPI (Windows voices) is the only TTS. Video jobs run only on a Windows worker.
 - `rm -rf` is blocked by a hook. Use a fresh temp directory instead of deleting.

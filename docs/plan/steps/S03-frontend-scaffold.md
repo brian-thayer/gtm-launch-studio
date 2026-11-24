@@ -1,6 +1,6 @@
 # S03: Frontend scaffold (Vite React TS, Tailwind/shadcn, Router/Query, tests)
 
-Status: todo
+Status: done
 Milestone: M1
 Depends on: S02
 Human in the loop: yes (approve `npm install`; network access to npm, and to the shadcn registry if it's used)
@@ -67,3 +67,18 @@ npm run e2e      # expect: 1 passed (msedge)
 - Brand theming from the catalog (S39).
 
 ## Notes
+
+Deviations:
+- **TypeScript is pinned to `~5.9.3`**, not the latest (7.0.2). `typescript-eslint` accepts `<6.1.0` and `openapi-typescript` accepts `^5.x`, so `npm install` failed with ERESOLVE on the latest. Revisit when both support a newer major.
+- **Extra dev dependency `@types/node@^24`**, for `node:url` in `vite.config.ts` (the `@` alias) and `playwright.config.ts`.
+- **Extra runtime dependency `radix-ui`**, installed by the shadcn CLI because `button` uses `Slot`.
+- **shadcn CLI needed fix-ups.** It resolved the `@` alias from the solution-style root `tsconfig.json`, found no `paths`, and wrote the three files to a literal `frontend/@/components/ui/` directory with `import { cn } from "cn"`. I moved them to `src/components/ui/`, corrected the import to `@/lib/utils`, and added `compilerOptions.paths` to the root `tsconfig.json` so later `shadcn add` runs resolve it. The CLI had also installed an unrelated `cn` npm package to satisfy that import; the code reviewer caught it and I removed it with `npm uninstall cn`. The registry was reachable, so nothing was hand-written.
+- **No `frontend/.gitignore`.** The root `.gitignore` already covers `node_modules`, `dist`, `frontend/playwright-report` and `frontend/test-results`.
+- **`react-refresh/only-export-components` is off for `src/components/ui/**`**, since shadcn files export `buttonVariants` next to the component.
+- **Vitest `include` is limited to `src/**/*.test.{ts,tsx}`** so it doesn't run the Playwright spec in `e2e/`. Vitest globals are off, and `src/test/setup.ts` registers Testing Library cleanup itself.
+- Prettier added two blank lines to `frontend/CLAUDE.md` (the hook formats `.md` files from now on).
+
+Follow-ups:
+- S04 adds the Vite `/api` proxy (there is a comment in `vite.config.ts` marking the spot) and `src/api/`. `openapi.json` and `src/api/schema.d.ts` are already in `.prettierignore` and the ESLint ignores.
+- Dark mode is wired as an opt-in `.dark` class variant, but no dark palette is defined. S39 (brand theme) should decide.
+- ESLint uses the non-type-aware `recommended` set. Consider `recommendedTypeChecked` once there is real feature code.

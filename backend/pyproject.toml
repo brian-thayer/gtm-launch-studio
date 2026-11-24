@@ -1,0 +1,121 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "gtm-studio"
+description = "GTM Launch Studio backend: context, planning, drafting, review."
+requires-python = ">=3.12"
+dynamic = ["version"]
+dependencies = [
+    "fastapi>=0.165",  # api/introspection.py relies on 0.165's lazy include_router wrappers
+    "uvicorn[standard]>=0.30",
+    "pydantic>=2.9",
+    "pydantic-settings>=2.5",
+    "structlog>=24.4",
+    "typer>=0.12",
+]
+
+[project.scripts]
+gtm = "gtm_studio.cli:app"
+
+[dependency-groups]
+dev = [
+    "pytest>=8.3",
+    "httpx2>=2.16",  # Starlette 1.10's TestClient wants httpx2 and deprecates plain httpx
+    "ruff>=0.8",
+    "pyright>=1.1.390",
+    "import-linter>=2.1",
+]
+
+# The version lives in one place: gtm_studio/__init__.py.
+[tool.hatch.version]
+path = "src/gtm_studio/__init__.py"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/gtm_studio"]
+
+# ---------------------------------------------------------------- ruff
+[tool.ruff]
+line-length = 110
+target-version = "py312"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM", "RUF", "S"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S101"]
+
+[tool.ruff.lint.flake8-bugbear]
+# FastAPI and Typer put these calls in argument defaults by design.
+extend-immutable-calls = [
+    "fastapi.Depends",
+    "fastapi.Security",
+    "fastapi.Query",
+    "fastapi.Path",
+    "fastapi.Body",
+    "fastapi.Header",
+    "fastapi.Cookie",
+    "fastapi.File",
+    "fastapi.Form",
+    "typer.Option",
+    "typer.Argument",
+]
+
+# -------------------------------------------------------------- pyright
+[tool.pyright]
+include = ["src", "tests"]
+pythonVersion = "3.12"
+typeCheckingMode = "standard"
+strict = ["src/gtm_studio/domain", "src/gtm_studio/services"]
+venvPath = "."
+venv = ".venv"
+
+# --------------------------------------------------------------- pytest
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+# importlib mode: test files need no __init__.py and may share a basename across folders.
+addopts = "-m 'not bedrock' -q --import-mode=importlib"
+markers = [
+    "bedrock: calls real AWS Bedrock and costs money. Needs `-m bedrock` and GTM_ALLOW_BEDROCK=1.",
+    "slow: slow test, deselect with `-m 'not slow'`.",
+]
+
+# -------------------------------------------------------- import-linter
+# Encodes the layer table in docs/architecture.md. Business rules never live in api/.
+[tool.importlinter]
+root_package = "gtm_studio"
+include_external_packages = true
+
+[[tool.importlinter.contracts]]
+name = "Layers: cli > api/worker > infrastructure > services > domain"
+type = "layers"
+layers = [
+    "gtm_studio.cli",
+    "gtm_studio.api | gtm_studio.worker",
+    "gtm_studio.adapters : gtm_studio.db : gtm_studio.auth : gtm_studio.audit : gtm_studio.catalog",
+    "gtm_studio.services",
+    "gtm_studio.domain",
+]
+
+[[tool.importlinter.contracts]]
+name = "Domain is pure: no IO frameworks, no settings"
+type = "forbidden"
+source_modules = ["gtm_studio.domain"]
+forbidden_modules = [
+    "sqlalchemy",
+    "fastapi",
+    "starlette",
+    "anthropic",
+    "boto3",
+    "httpx",
+    "httpx2",
+    "gtm_studio.settings",
+]
+
+[[tool.importlinter.contracts]]
+name = "Services take ports, not web or cloud SDKs"
+type = "forbidden"
+source_modules = ["gtm_studio.services"]
+forbidden_modules = ["fastapi", "starlette", "anthropic", "boto3"]
