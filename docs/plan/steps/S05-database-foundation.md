@@ -1,6 +1,6 @@
 # S05: Database foundation (SQLAlchemy 2, Alembic, SQLite WAL, test fixtures)
 
-Status: todo
+Status: done
 Milestone: M1
 Depends on: S04 (needs the OpenAPI contract loop)
 Human in the loop: no
@@ -71,3 +71,13 @@ cd ../frontend && npm run gen:api && npm run typecheck
 - Postgres in docker (backlog).
 
 ## Notes
+- **`UnitOfWork` shape.** The card says the UoW "yields a Session" and also that the port has repositories added in S06 and no SQLAlchemy types. Both hold with `SqlUnitOfWork.__enter__` returning `self` (the port is `__enter__ -> Self`) and a `.session` property valid inside the block. S06 attaches repositories to the same object. The app also stores `app.state.uow_factory` (a `partial(SqlUnitOfWork, session_factory)` typed as `UnitOfWorkFactory`), which the card implied with "the app wires the real one in".
+- **`UTCDateTime` (added, not in the card).** `DateTime(timezone=True)` alone returns naive datetimes on SQLite, which breaks the "aware UTC" convention for every later step. `db/base.py` has a small `TypeDecorator` over `DateTime(timezone=True)` that returns aware UTC and refuses naive input. Migrations still say `sa.DateTime(timezone=True)`: `migrate.render_item` (used by `env.py`) renders it that way, and a test runs `new_revision(autogenerate=True)` end to end to prove it.
+- **`client` always depends on `migrated_engine`** (rather than "where a test needs the schema"), so every API test gets the schema and the foot-gun is gone. It costs about 10 ms per test.
+- **Small additions:** `migrate.head()` and `migrate.new_revision()` (the CLI needs them), `db.engine.database_is_up()` (keeps `SELECT 1` out of the router), offline (`--sql`) migrations raise a clear error instead of being half-supported, `get_session` raises a readable error when the lifespan did not run.
+- **`get_session` never commits.** State changes go through a `UnitOfWork`. S06 should keep it that way for `auth` reads (or open a UoW for the one write, `last_seen`).
+- **Follow-up for the first batch migration (S06+).** `env.py` runs with `PRAGMA foreign_keys=ON` (set on every connection). Alembic's batch mode drops and recreates the table, which fails or cascades when other tables reference it. Before the first `batch_alter_table` on a referenced table, run `PRAGMA foreign_keys=OFF` on the migration connection in `env.py` (SQLite only). The baseline creates a table and needs none of this.
+- **Health stays `200` when `db` is `error`.** The card asked only for the field. If a load balancer should pull the instance, add a separate readiness route that answers 503 (an S09 hosting-notes item). `db: ok` also means only "answers `SELECT 1`", not "migrated": a readiness route should compare `migrate.current` with `migrate.head`.
+- **S02 follow-up done (in `settings.py`).** `Settings` now resolves relative paths for driver-qualified SQLite URLs (`sqlite+pysqlite:///x.db`) as well as `sqlite:///`, and leaves SQLite's `file:` URI form alone. Tests added in `tests/unit/test_settings.py`.
+- **Reviewer nits fixed:** `gtm db current` no longer creates an empty database file (`db.engine.sqlite_file` is shared with `make_engine`), and `test_models_use_portable_column_types_only` guards the portable-types criterion.
+- **Follow-up for S06 and S33: write transactions on SQLite.** pysqlite opens transactions lazily (a deferred `BEGIN`). In WAL mode a unit of work that reads and then writes can fail at once with `SQLITE_BUSY` when another writer (the worker) holds the lock, without waiting out `busy_timeout`. ADR-0004's `BEGIN IMMEDIATE` job claim needs the usual remedy: set `isolation_level=None` on the pysqlite connection in the `connect` event and emit `BEGIN` / `BEGIN IMMEDIATE` from a `begin` event, in `make_engine`. Do it once, in S06 or S33, for every write path.

@@ -83,10 +83,21 @@ def test_relative_sqlite_path_resolves_against_repo_root(
     assert Settings().db_url == f"sqlite:///{(REPO_ROOT / 'storage' / 'other.db').as_posix()}"
 
 
+@pytest.mark.parametrize("driver", ["sqlite", "sqlite+pysqlite"])
+def test_relative_sqlite_path_resolves_for_driver_qualified_urls(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, driver: str
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("GTM_DB_URL", f"{driver}:///storage/other.db")
+    assert Settings().db_url == f"{driver}:///{(REPO_ROOT / 'storage' / 'other.db').as_posix()}"
+
+
 @pytest.mark.parametrize(
     "url",
     [
         "sqlite://",
+        "sqlite+pysqlite:///:memory:",
+        "sqlite:///file:gtm.db?mode=ro&uri=true",
         "sqlite:///:memory:",
         "sqlite:////var/lib/gtm.db",
         "postgresql+psycopg://user@host/gtm",

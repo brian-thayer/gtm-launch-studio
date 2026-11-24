@@ -67,3 +67,20 @@ Newest entries go at the bottom. Each step appends one entry: what was built, an
 - Review: `code-reviewer` PASS WITH NITS, nothing blocking. It could not run `dev.ps1`; I ran start, a refused second start, and `-Stop` by hand, and the ports were free afterwards. Drift check done (a probe route made the contract test fail, then reverted).
 - Follow-ups: S06 must enforce `X-Requested-With` on state-changing requests; the `gtm-*` window titles are set but I couldn't read them back under Windows Terminal; run `/fewer-permission-prompts` after M1.
 - Verification: `uv run pytest` 50 passed · `ruff check` clean · `ruff format --check` 28 files formatted · `pyright` 0 errors · `lint-imports` 3 contracts kept · `npm run lint` clean · `npm run typecheck` clean · `npm run test` 13 passed (2 files) · `npx prettier --check .` clean · `npm run e2e` 2 passed (Playwright started both servers) · `dev.ps1` start/`-Stop` verified by hand · `gtm openapi` output identical to `frontend/openapi.json`.
+
+## S05 Database foundation (2026-11-24, Sonnet)
+- Built:
+  - `db/base.py` (naming convention, `IdMixin`, `TimestampMixin`, and the `UTCDateTime` column type), `db/engine.py` (`make_engine` with WAL, foreign keys and `busy_timeout` on SQLite, `make_session_factory`), `db/uow.py` (`SqlUnitOfWork`), `db/deps.py` (`get_session`, re-exported by `api/deps.py`);
+  - `services/ports.py` with the `UnitOfWork` Protocol and `UnitOfWorkFactory` (no SQLAlchemy in it); the app lifespan builds the engine, session factory and `uow_factory` (`create_app` stays IO-free);
+  - Alembic with a programmatic `Config`: `db/migrate.py` (`upgrade`, `downgrade`, `current`, `head`, `new_revision`), `migrations/env.py` (URL from `Settings`, `render_as_batch`, `compare_type`), and the `0001_baseline` migration that creates `app_meta` and its `install_id`;
+  - `gtm db upgrade | current | revision -m ... [--autogenerate]`;
+  - `/api/health` gained `db: ok | error` (a `SELECT 1`); `frontend/openapi.json` and `schema.d.ts` regenerated;
+  - test fixtures `migrated_engine`, `db_session`, and `client` on a migrated database; 22 new tests in `tests/service/` plus health and settings tests.
+- Deviations (full detail in the card's Notes):
+  - `SqlUnitOfWork.__enter__` returns itself and exposes `.session`, so S06 can hang repositories on it;
+  - added `UTCDateTime`: plain `DateTime(timezone=True)` returns naive datetimes on SQLite. Migrations still render `sa.DateTime(timezone=True)`, and an end-to-end autogenerate test proves it;
+  - `client` always depends on `migrated_engine`; small helpers added (`migrate.head`, `migrate.new_revision`, `database_is_up`, `sqlite_file`).
+- Done on the way: the S02 follow-up for driver-qualified SQLite URLs in `Settings`.
+- Review: `code-reviewer` PASS WITH NITS, nothing blocking. Fixed: `gtm db current` creating an empty database file, and a guard test for portable column types. The rest are follow-ups in the card's Notes.
+- Follow-ups: S06 or S33 must make SQLite write transactions `BEGIN IMMEDIATE` (pysqlite's lazy `BEGIN` can fail at once with `SQLITE_BUSY`); the first batch migration on a referenced table needs `PRAGMA foreign_keys=OFF` in `env.py`; a readiness route (S09) should check the migration revision, not just `SELECT 1`; S06's `auth` reads use `get_session`, which never commits.
+- Verification: `uv run pytest` 75 passed · `ruff check` clean · `ruff format --check` 41 files formatted · `pyright` 0 errors · `lint-imports` 3 contracts kept · `gtm db upgrade` then `gtm db current` printed `0001_baseline (head)` · `npm run gen:api` + `npm run typecheck` clean · `npm run test` 13 passed · `npm run lint` clean · `npm run e2e` 2 passed.

@@ -6,7 +6,13 @@ Rules that keep the generated OpenAPI contract stable (see ``api/openapi.py``):
 - Every router sets ``tags``. Operation IDs are ``<tag>_<function name>``.
 - The set of routes and their schemas never depends on ``Settings``. Mount routes unconditionally and
   decide inside the handler (a disabled feature answers 404), so ``gtm openapi`` is the same everywhere.
+- ``create_app`` does no IO. The database engine is built in the lifespan, so ``gtm openapi`` and
+  ``app.openapi()`` never touch it.
 """
+
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
+from functools import partial
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -14,6 +20,9 @@ from fastapi.routing import APIRoute
 
 from gtm_studio import __version__
 from gtm_studio.api.routes import health
+from gtm_studio.db.engine import make_engine, make_session_factory
+from gtm_studio.db.uow import SqlUnitOfWork
+from gtm_studio.services.ports import UnitOfWorkFactory
 from gtm_studio.settings import Settings
 
 API_PREFIX = "/api"
@@ -22,6 +31,21 @@ API_PREFIX = "/api"
 def _operation_id(route: APIRoute) -> str:
     tag = route.tags[0] if route.tags else "default"
     return f"{tag}_{route.name}"
+
+
+@asynccontextmanager
+async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
+    """Open the database for the life of the process. It does not migrate: run ``gtm db upgrade``."""
+    engine = make_engine(app.state.settings)
+    session_factory = make_session_factory(engine)
+    uow_factory: UnitOfWorkFactory = partial(SqlUnitOfWork, session_factory)
+    app.state.engine = engine
+    app.state.session_factory = session_factory
+    app.state.uow_factory = uow_factory
+    try:
+        yield
+    finally:
+        engine.dispose()
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
@@ -36,6 +60,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         openapi_url=f"{API_PREFIX}/openapi.json" if expose_docs else None,
         swagger_ui_oauth2_redirect_url=None,  # we don't authorize through Swagger UI
         generate_unique_id_function=_operation_id,
+        lifespan=_lifespan,
     )
     app.state.settings = settings
     if settings.cors_origins:

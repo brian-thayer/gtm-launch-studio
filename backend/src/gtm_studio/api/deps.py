@@ -2,6 +2,7 @@
 
 from fastapi import Request
 
+from gtm_studio.db.deps import get_session as get_session  # re-export: routers import deps from here
 from gtm_studio.settings import Settings
 
 

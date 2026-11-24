@@ -8,10 +8,13 @@ import typer
 from gtm_studio import __version__
 from gtm_studio.api.app import create_app
 from gtm_studio.api.openapi import render_openapi
+from gtm_studio.db import migrate
 from gtm_studio.settings import Settings
 from gtm_studio.worker.runner import run_idle
 
 app = typer.Typer(name="gtm", help="GTM Launch Studio.", no_args_is_help=True, add_completion=False)
+db_app = typer.Typer(help="Database migrations.", no_args_is_help=True)
+app.add_typer(db_app, name="db")
 
 
 @app.command()
@@ -32,6 +35,39 @@ def openapi() -> None:
     sys.stdout.flush()
     sys.stdout.buffer.write(schema.encode("ascii"))
     sys.stdout.buffer.flush()
+
+
+@db_app.command("upgrade")
+def db_upgrade(
+    revision: Annotated[str, typer.Argument(help="Target revision.")] = "head",
+) -> None:
+    """Create or migrate the database (GTM_DB_URL) up to a revision, by default the latest."""
+    settings = Settings()
+    migrate.upgrade(settings, revision)
+    typer.echo(f"database is at {migrate.current(settings)}")
+
+
+@db_app.command("current")
+def db_current() -> None:
+    """Print the database's migration revision, marked (head) when it is the latest."""
+    settings = Settings()
+    revision = migrate.current(settings)
+    if revision is None:
+        typer.echo("(not migrated: run `gtm db upgrade`)")
+    else:
+        typer.echo(f"{revision} (head)" if revision == migrate.head(settings) else revision)
+
+
+@db_app.command("revision")
+def db_revision(
+    message: Annotated[str, typer.Option("-m", "--message", help="What the migration does.")],
+    autogenerate: Annotated[
+        bool, typer.Option("--autogenerate", help="Fill it in from the models' difference to the database.")
+    ] = False,
+) -> None:
+    """Write a new migration file. With --autogenerate, upgrade the database first; review the result."""
+    for script in migrate.new_revision(Settings(), message, autogenerate=autogenerate):
+        typer.echo(f"created {script.path}")
 
 
 @app.command()

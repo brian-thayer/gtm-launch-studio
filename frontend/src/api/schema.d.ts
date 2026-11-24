@@ -28,6 +28,11 @@ export interface components {
         /** HealthResponse */
         HealthResponse: {
             /**
+             * Db
+             * @enum {string}
+             */
+            db: "ok" | "error";
+            /**
              * Env
              * @enum {string}
              */

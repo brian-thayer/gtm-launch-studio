@@ -22,7 +22,7 @@ Context in ──► Facts / Snapshots ──► Planner ──► Jobs ──�
 The layering rules are enforced by three `import-linter` contracts in `backend/pyproject.toml` (`uv run lint-imports`). The infrastructure packages form one layer on purpose: `audit` writes `db` models and `auth` binds the actor into `audit.context`, so they must be able to import one another. `gtm_studio.settings` sits outside the layers; only `domain` is forbidden from importing it.
 
 ## Ports (protocols defined by services)
-`Repositories` (per aggregate) · `LLMClient` · `JobQueue` · `BlobStore` · `AuditLog` · `AhaSource` · `KnowledgeSource` · `DocumentExtractor` · `Renderer` (per format and family) · `TTSProvider` · `Clock` · `AuthProvider`
+`UnitOfWork` (implemented: `services/ports.py`, `db/uow.py`) · `Repositories` (per aggregate) · `LLMClient` · `JobQueue` · `BlobStore` · `AuditLog` · `AhaSource` · `KnowledgeSource` · `DocumentExtractor` · `Renderer` (per format and family) · `TTSProvider` · `Clock` · `AuthProvider`
 
 ## Key aggregates
 - `User`, `Role`, `UserRole`.

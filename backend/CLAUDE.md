@@ -2,9 +2,9 @@
 
 ## Layout (`src/gtm_studio/`)
 - `domain/`: pure dataclasses and Pydantic models, the lifecycle state machine, the planner, the fact diff and the safety rule. **No IO**: no SQLAlchemy, FastAPI, anthropic, boto3 or filesystem.
-- `services/`: use cases. They take ports (repositories, `LLMClient`, `BlobStore`, `AuditLog`) as constructor arguments and own transactions.
+- `services/`: use cases. They take ports (repositories, `LLMClient`, `BlobStore`, `AuditLog`) as constructor arguments and own transactions. The ports live in `services/ports.py`; services never import `gtm_studio.db`, so they receive a `UnitOfWorkFactory` (`Callable[[], UnitOfWork]`) and use `with uow_factory() as uow:`.
 - `adapters/`: implementations of the ports: `llm/` (bedrock, mock), `aha/`, `docs/`, `kb/`, `render/`, `tts/`, `storage/`.
-- `db/`: SQLAlchemy 2 typed ORM models, repositories and Alembic migrations (`db/migrations/`).
+- `db/`: SQLAlchemy 2 typed ORM models (`db/models/`, every module imported in `db/models/__init__.py`), repositories and Alembic migrations (`db/migrations/`). `base.py` (`Base`, `IdMixin`, `TimestampMixin`), `engine.py` (`make_engine`, `make_session_factory`), `uow.py` (`SqlUnitOfWork`, the real `UnitOfWork`), `migrate.py` (Alembic from code), `deps.py` (`get_session`, re-exported by `api/deps.py`).
 - `auth/`: `AuthProvider` (dev, oidc), sessions, and the `current_user` / `require(...)` dependencies.
 - `audit/`: the `AuditLog` service and the request-ID middleware.
 - `api/`: FastAPI routers. These are thin: validate, call a service, map to a response schema.
@@ -18,8 +18,13 @@
 ## Conventions
 - Python 3.12, fully type-hinted, and `pyright` clean in strict mode for `domain/` and `services/`.
 - Settings come only from `gtm_studio.settings.Settings` (pydantic-settings, prefix `GTM_`). Never read `os.environ` elsewhere. Never cache settings with `lru_cache`; pass them in. In handlers, get them with the `api.deps.get_settings` dependency. `Settings.defaults()` ignores the environment (for output that must not vary by machine, such as the OpenAPI export).
-- IDs are UUID strings and timestamps are timezone-aware UTC. Every table has `created_at`, and mutable tables have `updated_at`.
-- Every schema change ships an Alembic migration written for SQLite (`render_as_batch=True`) and portable to Postgres. Never use `create_all` outside tests.
+- IDs are UUID strings and timestamps are timezone-aware UTC. Every table has `created_at`, and mutable tables have `updated_at`. Use `IdMixin` and `TimestampMixin`: they set the values in Python, and the `UTCDateTime` column type returns aware UTC even on SQLite (which would otherwise return naive datetimes) and refuses naive input. Build timestamps with `db.base.utcnow()`, never `datetime.now()` or `utcnow()` from the standard library.
+- Columns use portable types only: `String`, `Text`, `JSON`, `DateTime(timezone=True)` (via `UTCDateTime`), `Boolean`, `Integer`. No SQLite-only SQL outside dialect-guarded migration code.
+- Every schema change ships an Alembic migration written for SQLite (`render_as_batch=True`) and portable to Postgres. Never use `create_all` outside tests (`tests/service/test_migrations.py` fails if `src/` mentions it).
+  - Workflow: change the model, `uv run gtm db upgrade`, then `uv run gtm db revision -m "what changed" --autogenerate`, then **read and edit** the generated file. `tests/service/test_migrations.py` fails when models and migrations disagree.
+  - A migration uses `sa.*` types and plain Python only. It never imports application code, because that code changes later and the migration must not.
+  - Name constraints through the `Base` naming convention. When a batch migration first touches a table that other tables reference, switch `PRAGMA foreign_keys` off around it in `env.py` (see the S05 notes).
+- The engine and session factory are built in the app lifespan (`app.state.session_factory`, `app.state.uow_factory`), never in `create_app`. The lifespan does not migrate: run `gtm db upgrade`. A handler reads through `Depends(get_session)` (never commits). A state change goes through a `UnitOfWork`, so the change and its audit event commit together.
 - API schemas live in `api/schemas/`, separate from ORM models. Every endpoint has a `response_model` and a permission dependency.
 - Every router sets `tags`: operation IDs are `<tag>_<function name>`, and they end up in the generated TypeScript client.
 - **The OpenAPI schema never depends on settings.** Mount every route unconditionally and decide inside the handler (a disabled feature answers 404). `gtm openapi` builds the app from `Settings.defaults()`, and the contract test compares its output to `frontend/openapi.json`. Use `gtm_studio.api.openapi.render_openapi` for any serialization.
@@ -34,7 +39,7 @@
 
 ## Tests (`tests/`)
 - `tests/unit/` covers domain code, with no DB.
-- `tests/service/` runs against a temp SQLite DB migrated with Alembic (fixture `db_session`).
+- `tests/service/` runs against a temp SQLite DB migrated with Alembic: fixtures `migrated_engine` (a fresh database per test, migrated to head) and `db_session` (a session on it). The `client` fixture depends on `migrated_engine`, so API tests get the schema too.
 - `tests/api/` uses FastAPI `TestClient` with the `login_as(role)` fixture.
 - Fixtures: `tests/fixtures/` holds a minimal catalog (`catalog_min/`) and sample Aha! files.
 - Markers: `bedrock` (real AWS calls, deselected by default) and `slow`.

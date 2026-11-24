@@ -5,6 +5,7 @@ the CLI each build one and pass it down, so tests can build as many differently 
 they need.
 """
 
+import re
 from pathlib import Path
 from typing import Annotated, Literal, Self
 
@@ -16,6 +17,8 @@ REPO_ROOT = Path(__file__).resolve().parents[3]
 ENV_FILE = REPO_ROOT / "backend" / ".env"
 
 _SQLITE_PREFIX = "sqlite:///"
+# 'sqlite:///', and driver-qualified forms such as 'sqlite+pysqlite:///'.
+_SQLITE_URL = re.compile(r"(?P<prefix>sqlite(?:\+\w+)?:///)(?P<target>.*)", re.DOTALL)
 
 
 def _resolve_path(value: Path) -> Path:
@@ -63,14 +66,15 @@ class Settings(BaseSettings):
     @classmethod
     def _absolute_sqlite_path(cls, value: str) -> str:
         """Resolve a relative SQLite file path against the repo root. Other URLs pass through."""
-        if not value.startswith(_SQLITE_PREFIX):
+        match = _SQLITE_URL.fullmatch(value)
+        if match is None:
             return value
-        target = value.removeprefix(_SQLITE_PREFIX)
-        # '' and ':memory:' are in-memory databases. A leading '/' is an absolute POSIX path
-        # ('sqlite:////abs/path'), which Path.is_absolute() would call relative on Windows.
-        if not target or target.startswith((":", "/")) or Path(target).is_absolute():
+        target = match["target"]
+        # '' and ':memory:' are in-memory databases and 'file:' is SQLite's URI form. A leading '/' is
+        # an absolute POSIX path ('sqlite:////abs/path'), which Path.is_absolute() calls relative on Windows.
+        if not target or target.startswith((":", "/", "file:")) or Path(target).is_absolute():
             return value
-        return f"{_SQLITE_PREFIX}{_resolve_path(Path(target)).as_posix()}"
+        return f"{match['prefix']}{_resolve_path(Path(target)).as_posix()}"
 
     @field_validator("cors_origins", mode="before")
     @classmethod

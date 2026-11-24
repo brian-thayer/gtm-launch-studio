@@ -6,9 +6,13 @@ from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
+from sqlalchemy import Engine
+from sqlalchemy.orm import Session
 
 from gtm_studio.api.app import create_app
 from gtm_studio.api.introspection import RouteInfo, list_routes
+from gtm_studio.db.engine import make_engine, make_session_factory
+from gtm_studio.db.migrate import upgrade
 from gtm_studio.settings import Settings
 
 
@@ -41,7 +45,26 @@ def api_routes(settings: Settings) -> list[RouteInfo]:
 
 
 @pytest.fixture
-def client(settings: Settings) -> Iterator[TestClient]:
-    """A TestClient for an app built from the test settings. Entering it runs the app lifespan."""
+def migrated_engine(settings: Settings) -> Iterator[Engine]:
+    """An engine on a fresh database (in tmp_path, so one per test) migrated to head by Alembic."""
+    upgrade(settings)
+    engine = make_engine(settings)
+    try:
+        yield engine
+    finally:
+        engine.dispose()  # releases the SQLite file so tmp_path can be cleaned up on Windows
+
+
+@pytest.fixture
+def db_session(migrated_engine: Engine) -> Iterator[Session]:
+    """A session on the migrated test database. It does not commit for you."""
+    with make_session_factory(migrated_engine)() as session:
+        yield session
+
+
+@pytest.fixture
+def client(settings: Settings, migrated_engine: Engine) -> Iterator[TestClient]:
+    """A TestClient for an app built from the test settings, on the migrated database. Entering it
+    runs the app lifespan."""
     with TestClient(create_app(settings)) as test_client:
         yield test_client
