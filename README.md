@@ -49,14 +49,17 @@ uv run pyright                            # types (strict for domain/ and servic
 uv run lint-imports                       # layering contracts
 uv run uvicorn gtm_studio.api.app:create_app --factory --reload --port 8000
 # then open http://127.0.0.1:8000/api/health and http://127.0.0.1:8000/api/docs
-uv run gtm --help                         # version, openapi, worker
+uv run gtm --help                         # version, openapi, db, seed, worker
+uv run gtm db upgrade && uv run gtm seed dev-users   # migrate, then create the demo users (safe to repeat)
 ```
 
 Configuration comes from `GTM_*` environment variables, or from a git-ignored `backend/.env`. Every setting is optional:
 
 | Variable | Default | Meaning |
 |---|---|---|
-| `GTM_ENV` | `dev` | `dev`, `test` or `production`. Production turns off the interactive API docs. |
+| `GTM_ENV` | `dev` | `dev`, `test` or `production`. Production turns off the interactive API docs, marks the session cookie `Secure`, and refuses to start with the dev login or the built-in session secret. |
+| `GTM_AUTH_PROVIDER` | `dev` | `dev` (pick a seeded user, no password) or `oidc` (S09). Must be `oidc` in production. |
+| `GTM_SESSION_SECRET` | built-in dev value | Signs the session cookie. Required in production: at least 32 random characters. |
 | `GTM_DB_URL` | `sqlite:///<repo>/storage/gtm_studio.db` | SQLAlchemy URL. A relative SQLite path resolves against the repo root. |
 | `GTM_STORAGE_DIR` | `<repo>/storage` | Local runtime data. |
 | `GTM_CATALOG_DIR` | `<repo>/gtm_catalog` | The GTM framework as data. |

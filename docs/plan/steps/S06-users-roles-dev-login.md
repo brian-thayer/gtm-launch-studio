@@ -1,6 +1,6 @@
 # S06: Users, roles, permissions, dev login, sessions
 
-Status: todo
+Status: done
 Milestone: M1
 Depends on: S05
 Human in the loop: no
@@ -101,3 +101,15 @@ uv run gtm db upgrade && uv run gtm seed dev-users && uv run gtm seed dev-users 
 - A user-management UI (backlog).
 
 ## Notes
+- **`current_actor` reads through `IdentityService` and a unit of work, not `get_session`.** The card (and the S05 follow-up) said auth reads would use `db.deps.get_session`. Doing that would have meant `auth` calling the repository directly and `IdentityService.get_actor` going unused at request time. Instead `auth/deps.py` builds `IdentityService(app.state.uow_factory)`, so one code path resolves an actor (login, `/me` and every protected route). Cost: a unit of work, which commits (a no-op for a read), per authenticated request.
+- **Ports return `UserRecord`, not ORM rows.** `services/ports.py` now has `IdentityRepository`, and `UnitOfWork` gained an `identity` property (`SqlUnitOfWork.identity` builds `SqlIdentityRepository` over its session). `UserRecord` and the literal types live in `domain/identity.py`. `upsert_user` only writes the user row: the seed decides created / updated / unchanged in the service and calls `set_roles` separately.
+- **Production validation is stricter than the card:** besides "not dev" and "not the built-in secret", `session_secret` must be at least 32 characters. Because of the validator, two existing settings tests that built `Settings()` under `GTM_ENV=production` now also set `GTM_AUTH_PROVIDER=oidc` and a real secret.
+- **The dev-secret warning is logged from the app lifespan, not `create_app`.** structlog isn't configured until S07 and defaults to stdout, so a warning in `create_app` would corrupt `gtm openapi > file`. It fires only for `env=dev`.
+- **Small additions:** `SeedError` (a bad or conflicting seed file, shown by the CLI without a traceback); `gtm seed dev-users` refuses `GTM_ENV=production` and an un-migrated database; `can_approve` also requires `ASSET_REVIEW`, so a gate that lists `viewer` can't make a viewer an approver; `DevLoginRequest.user_id` is limited to 36 characters; the composite unique constraint is named `uq_users_auth_provider_subject` explicitly (the naming convention would have named it after its first column). The `app`, `uow_factory`, `seeded` and `login_as` fixtures are in `tests/conftest.py`.
+- **Size budget exceeded** (about 600 lines): about 750 lines of source and 700 of tests. I kept the tests in this step because the route-guard and production-settings tests are acceptance criteria. Splitting them off later would leave the criteria unproven.
+- **Follow-ups:**
+  - S33: SQLite write transactions need `BEGIN IMMEDIATE` (still open from S05). S06's writes (`record_login`, the seed) are single statements or run from the CLI, so they don't hit the read-then-write deadlock yet.
+  - S07: replace `# TODO(S07): audit` in `api/routes/auth.py` (login and logout), and give `record_login` an audit row in the same transaction.
+  - S08: `scripts/dev.ps1` should run `gtm seed dev-users` after `gtm db upgrade`, so the login page has users.
+  - The `storage/gtm_studio.db` I migrated during verification has the constraint's earlier name (`uq_users_auth_provider`), because I renamed it after the first run. It is harmless; recreate the file when convenient.
+  - `npx prettier --check .` flags 9 existing frontend files (`CLAUDE.md`, `e2e/smoke.spec.ts`, `playwright.config.ts`, `src/api/client.ts` and its test, `useHealth.ts`, `HomePage` and its test, `vite.config.ts`). S06 didn't touch them and they have LF endings; S04 logged prettier as clean, so look at what changed in the environment.

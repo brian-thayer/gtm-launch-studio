@@ -1,10 +1,12 @@
 """Shared fixtures. Tests never read the developer's real backend/.env or GTM_* environment."""
 
 import os
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
+from functools import partial
 from pathlib import Path
 
 import pytest
+from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from sqlalchemy import Engine
 from sqlalchemy.orm import Session
@@ -13,7 +15,10 @@ from gtm_studio.api.app import create_app
 from gtm_studio.api.introspection import RouteInfo, list_routes
 from gtm_studio.db.engine import make_engine, make_session_factory
 from gtm_studio.db.migrate import upgrade
-from gtm_studio.settings import Settings
+from gtm_studio.db.uow import SqlUnitOfWork
+from gtm_studio.services.identity import IdentityService, SeedSummary
+from gtm_studio.services.ports import UnitOfWorkFactory
+from gtm_studio.settings import REPO_ROOT, Settings
 
 
 @pytest.fixture(autouse=True)
@@ -68,3 +73,45 @@ def client(settings: Settings, migrated_engine: Engine) -> Iterator[TestClient]:
     runs the app lifespan."""
     with TestClient(create_app(settings)) as test_client:
         yield test_client
+
+
+@pytest.fixture
+def uow_factory(migrated_engine: Engine) -> UnitOfWorkFactory:
+    """Units of work on the migrated test database, as services receive them."""
+    return partial(SqlUnitOfWork, make_session_factory(migrated_engine))
+
+
+@pytest.fixture
+def seeded(uow_factory: UnitOfWorkFactory) -> SeedSummary:
+    """The migrated database with the demo users from ``config/dev_users.yaml`` in it."""
+    return IdentityService(uow_factory).seed_dev_users(REPO_ROOT / "config" / "dev_users.yaml")
+
+
+@pytest.fixture
+def app(settings: Settings) -> FastAPI:
+    """An app built from the test settings. Add test-only routes to it before using ``login_as``."""
+    return create_app(settings)
+
+
+LoginAs = Callable[..., TestClient]
+
+
+@pytest.fixture
+def login_as(app: FastAPI, seeded: SeedSummary) -> Iterator[LoginAs]:
+    """``login_as("pmm")``: a TestClient signed in as the first seeded user holding that role. Each call
+    gets its own cookie jar, so one test can act as several people. Pass ``csrf=False`` to leave out the
+    ``X-Requested-With`` header on every request after the login."""
+    with TestClient(app):  # runs the lifespan once, for every client below
+
+        def _login_as(role_key: str, *, csrf: bool = True) -> TestClient:
+            http = TestClient(app)
+            header = {"X-Requested-With": "gtm-studio"}
+            users = http.get("/api/auth/options").json()["dev_users"]
+            user = next(u for u in users if role_key in u["roles"])
+            response = http.post("/api/auth/dev/login", json={"user_id": user["id"]}, headers=header)
+            assert response.status_code == 200, response.text
+            if csrf:
+                http.headers.update(header)
+            return http
+
+        yield _login_as

@@ -9,12 +9,16 @@ import re
 from pathlib import Path
 from typing import Annotated, Literal, Self
 
-from pydantic import field_validator
+from pydantic import SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 # backend/src/gtm_studio/settings.py -> parents[3] is the repository root.
 REPO_ROOT = Path(__file__).resolve().parents[3]
 ENV_FILE = REPO_ROOT / "backend" / ".env"
+
+# Public on purpose: it only has to be good enough for a local run, and production refuses it.
+DEV_SESSION_SECRET = "dev-only-session-secret-not-for-hosting"  # noqa: S105 (public on purpose, see above)
+MIN_SESSION_SECRET_LENGTH = 32
 
 _SQLITE_PREFIX = "sqlite:///"
 # 'sqlite:///', and driver-qualified forms such as 'sqlite+pysqlite:///'.
@@ -47,6 +51,11 @@ class Settings(BaseSettings):
     # the Vite dev proxy and a same-origin deployment don't need it. Set as a comma-separated list.
     # NoDecode: pydantic-settings would otherwise insist on a JSON array for a list field.
     cors_origins: Annotated[list[str], NoDecode] = []
+    # Signs the session cookie. The default is public (it is in the repository): fine for a local run,
+    # refused in production. Generate one with `python -c "import secrets; print(secrets.token_urlsafe(48))"`.
+    session_secret: SecretStr = SecretStr(DEV_SESSION_SECRET)
+    # 'dev' lists the seeded users on the login page (no password). 'oidc' arrives in S09.
+    auth_provider: Literal["dev", "oidc"] = "dev"
 
     @classmethod
     def defaults(cls) -> Self:
@@ -96,3 +105,23 @@ class Settings(BaseSettings):
     @classmethod
     def _upper_log_level(cls, value: object) -> object:
         return value.upper() if isinstance(value, str) else value
+
+    @model_validator(mode="after")
+    def _production_is_safe(self) -> Self:
+        """Hosted use must not be able to log in without a password or sign cookies with a public key.
+
+        ``Settings.defaults()`` builds with ``model_construct``, which skips this on purpose: it is always
+        ``env='dev'``.
+        """
+        if self.env != "production":
+            return self
+        if self.auth_provider == "dev":
+            raise ValueError(
+                "auth_provider 'dev' (passwordless login) is not allowed when env is 'production'"
+            )
+        secret = self.session_secret.get_secret_value()
+        if secret == DEV_SESSION_SECRET:
+            raise ValueError("set session_secret (GTM_SESSION_SECRET): the built-in one is public")
+        if len(secret) < MIN_SESSION_SECRET_LENGTH:
+            raise ValueError(f"session_secret must be at least {MIN_SESSION_SECRET_LENGTH} characters")
+        return self

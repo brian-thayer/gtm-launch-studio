@@ -20,7 +20,7 @@ Status values: `todo` · `in progress` · `done` · `blocked`. **Human** marks s
 | S03 | Frontend scaffold (Vite React TS, Tailwind/shadcn, Router/Query, tests) | done | S02 | approve `npm install` |
 | S04 | Dev runner, Vite proxy, OpenAPI → TS client loop | done | S02, S03 | |
 | S05 | Database foundation (SQLAlchemy 2, Alembic, SQLite WAL, test fixtures) | done | S04 | |
-| S06 | Users, roles, permissions, dev login, sessions | todo | S05 | |
+| S06 | Users, roles, permissions, dev login, sessions | done | S05 | |
 | S07 | Audit log, request IDs, structured logging, activity API | todo | S06 | |
 | S08 | Frontend login, app shell, protected routes, Activity page | todo | S04, S07 | |
 | S09 | OIDC provider skeleton, hosting notes, security review | todo | S07 | |

@@ -4,8 +4,8 @@
 - `domain/`: pure dataclasses and Pydantic models, the lifecycle state machine, the planner, the fact diff and the safety rule. **No IO**: no SQLAlchemy, FastAPI, anthropic, boto3 or filesystem.
 - `services/`: use cases. They take ports (repositories, `LLMClient`, `BlobStore`, `AuditLog`) as constructor arguments and own transactions. The ports live in `services/ports.py`; services never import `gtm_studio.db`, so they receive a `UnitOfWorkFactory` (`Callable[[], UnitOfWork]`) and use `with uow_factory() as uow:`.
 - `adapters/`: implementations of the ports: `llm/` (bedrock, mock), `aha/`, `docs/`, `kb/`, `render/`, `tts/`, `storage/`.
-- `db/`: SQLAlchemy 2 typed ORM models (`db/models/`, every module imported in `db/models/__init__.py`), repositories and Alembic migrations (`db/migrations/`). `base.py` (`Base`, `IdMixin`, `TimestampMixin`), `engine.py` (`make_engine`, `make_session_factory`), `uow.py` (`SqlUnitOfWork`, the real `UnitOfWork`), `migrate.py` (Alembic from code), `deps.py` (`get_session`, re-exported by `api/deps.py`).
-- `auth/`: `AuthProvider` (dev, oidc), sessions, and the `current_user` / `require(...)` dependencies.
+- `db/`: SQLAlchemy 2 typed ORM models (`db/models/`, every module imported in `db/models/__init__.py`), repositories (`db/repositories/`) and Alembic migrations (`db/migrations/`). `base.py` (`Base`, `IdMixin`, `TimestampMixin`), `engine.py` (`make_engine`, `make_session_factory`), `uow.py` (`SqlUnitOfWork`, the real `UnitOfWork`), `migrate.py` (Alembic from code), `deps.py` (`get_session`, re-exported by `api/deps.py`).
+- `auth/`: `AuthProvider` (dev, oidc), sessions, the CSRF header middleware, and the `current_actor` / `require(...)` dependencies.
 - `audit/`: the `AuditLog` service and the request-ID middleware.
 - `api/`: FastAPI routers. These are thin: validate, call a service, map to a response schema.
 - `worker/`: the job queue consumer.
@@ -26,6 +26,12 @@
   - Name constraints through the `Base` naming convention. When a batch migration first touches a table that other tables reference, switch `PRAGMA foreign_keys` off around it in `env.py` (see the S05 notes).
 - The engine and session factory are built in the app lifespan (`app.state.session_factory`, `app.state.uow_factory`), never in `create_app`. The lifespan does not migrate: run `gtm db upgrade`. A handler reads through `Depends(get_session)` (never commits). A state change goes through a `UnitOfWork`, so the change and its audit event commit together.
 - API schemas live in `api/schemas/`, separate from ORM models. Every endpoint has a `response_model` and a permission dependency.
+- **Identity** (ADR-0002):
+  - A handler gets the caller from `auth.deps`: `current_actor` (any signed-in user, 401 otherwise) or `require(Permission.X, ...)` (403 when missing). The only open routes are `/api/health`, `/api/auth/options` and `/api/auth/dev/login`. `tests/api/test_auth.py` lists every route and fails when another one lacks `current_actor`, so add the dependency, don't extend the allowlist.
+  - Permissions and "may this actor approve this gate" are pure code in `domain/identity.py`. `admin` has every permission but `can_approve(actor, gate_roles)` is true only for a holder of one of the gate's approver roles (separation of duties). Any role that isn't `admin` or `viewer` is an approver role.
+  - Services get repositories from the unit of work (`uow.identity`; the ports are in `services/ports.py`, the SQLAlchemy versions in `db/repositories/`). Repositories flush and never commit. They return domain values, never ORM objects.
+  - The session is Starlette's signed cookie (`gtm_session`, httpOnly, `SameSite=Lax`, `Secure` in production, 8 h). `auth/csrf.py` rejects `POST`/`PUT`/`PATCH`/`DELETE` under `/api` without `X-Requested-With: gtm-studio`. Every new state-changing endpoint also needs an `audit_events` row (S07; until then leave `# TODO(S07): audit`).
+  - Settings refuse `GTM_ENV=production` with the dev provider or the built-in `session_secret`. Dev users come from `config/dev_users.yaml` through `gtm seed dev-users`.
 - Every router sets `tags`: operation IDs are `<tag>_<function name>`, and they end up in the generated TypeScript client.
 - **The OpenAPI schema never depends on settings.** Mount every route unconditionally and decide inside the handler (a disabled feature answers 404). `gtm openapi` builds the app from `Settings.defaults()`, and the contract test compares its output to `frontend/openapi.json`. Use `gtm_studio.api.openapi.render_openapi` for any serialization.
 - Everything is under `/api`, including the interactive docs (`/api/docs`, off when `GTM_ENV=production`).
@@ -40,7 +46,7 @@
 ## Tests (`tests/`)
 - `tests/unit/` covers domain code, with no DB.
 - `tests/service/` runs against a temp SQLite DB migrated with Alembic: fixtures `migrated_engine` (a fresh database per test, migrated to head) and `db_session` (a session on it). The `client` fixture depends on `migrated_engine`, so API tests get the schema too.
-- `tests/api/` uses FastAPI `TestClient` with the `login_as(role)` fixture.
+- `tests/api/` uses FastAPI `TestClient` with the `login_as(role_key)` fixture: it seeds the dev users (`seeded`), signs in as the first one holding that role and sends the CSRF header (`csrf=False` leaves it off). Each call gets its own cookie jar. The `app` fixture is the app it uses, so a test can add a probe route before calling it. `uow_factory` gives a service the migrated test database.
 - Fixtures: `tests/fixtures/` holds a minimal catalog (`catalog_min/`) and sample Aha! files.
 - Markers: `bedrock` (real AWS calls, deselected by default) and `slow`.
 - pytest runs in `importlib` import mode: test folders have no `__init__.py`, and tests can't import from `conftest.py` or from each other. Share code through fixtures, or put it in `src/`.

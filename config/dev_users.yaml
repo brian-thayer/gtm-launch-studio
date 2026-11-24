@@ -1,0 +1,28 @@
+# Demo users for the dev login (GTM_AUTH_PROVIDER=dev). `gtm seed dev-users` loads them.
+#
+# The IDs are fixed on purpose: tests and e2e runs refer to them. Seeding is idempotent, and it never
+# removes users that are not listed here. It refuses to run when GTM_ENV=production.
+#
+# Roles: `admin` and `viewer` are system roles. The three approver roles below (pmm, product, cs) are
+# placeholder approver roles; replaced by catalog roles in S15.
+users:
+  - id: "00000000-0000-4000-8000-000000000001"
+    email: "avery.admin@example.test"
+    display_name: "Avery Admin"
+    roles: [admin]
+  - id: "00000000-0000-4000-8000-000000000002"
+    email: "val.viewer@example.test"
+    display_name: "Val Viewer"
+    roles: [viewer]
+  - id: "00000000-0000-4000-8000-000000000003"
+    email: "priya.pmm@example.test"
+    display_name: "Priya Marketing"
+    roles: [pmm]
+  - id: "00000000-0000-4000-8000-000000000004"
+    email: "pat.product@example.test"
+    display_name: "Pat Product"
+    roles: [product]
+  - id: "00000000-0000-4000-8000-000000000005"
+    email: "casey.cs@example.test"
+    display_name: "Casey Customer Success"
+    roles: [cs]

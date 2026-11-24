@@ -4,6 +4,80 @@
  */
 
 export interface paths {
+    "/api/auth/dev/login": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Dev Login
+         * @description Sign in as a seeded user. 404 for an unknown or inactive user, and whenever the provider isn't dev.
+         */
+        post: operations["auth_dev_login"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/auth/logout": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Logout */
+        post: operations["auth_logout"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/auth/me": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Me */
+        get: operations["auth_me"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/auth/options": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Options
+         * @description Unauthenticated: what the login page needs.
+         */
+        get: operations["auth_options"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/health": {
         parameters: {
             query?: never;
@@ -25,6 +99,38 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /**
+         * AuthOptions
+         * @description What the login page shows. ``dev_users`` is filled only for the dev provider.
+         */
+        AuthOptions: {
+            /** Dev Users */
+            dev_users?: components["schemas"]["DevUserOption"][];
+            /**
+             * Provider
+             * @enum {string}
+             */
+            provider: "dev" | "oidc";
+        };
+        /** DevLoginRequest */
+        DevLoginRequest: {
+            /** User Id */
+            user_id: string;
+        };
+        /** DevUserOption */
+        DevUserOption: {
+            /** Display Name */
+            display_name: string;
+            /** Id */
+            id: string;
+            /** Roles */
+            roles: string[];
+        };
+        /** HTTPValidationError */
+        HTTPValidationError: {
+            /** Detail */
+            detail?: components["schemas"]["ValidationError"][];
+        };
         /** HealthResponse */
         HealthResponse: {
             /**
@@ -45,6 +151,37 @@ export interface components {
             /** Version */
             version: string;
         };
+        /** Me */
+        Me: {
+            /** Display Name */
+            display_name: string;
+            /** Email */
+            email: string;
+            /** Id */
+            id: string;
+            /** Permissions */
+            permissions: components["schemas"]["Permission"][];
+            /** Roles */
+            roles: string[];
+        };
+        /**
+         * Permission
+         * @enum {string}
+         */
+        Permission: "solution:read" | "context:write" | "import:run" | "asset:generate" | "asset:review" | "audit:read" | "catalog:read" | "catalog:admin" | "user:admin";
+        /** ValidationError */
+        ValidationError: {
+            /** Context */
+            ctx?: Record<string, never>;
+            /** Input */
+            input?: unknown;
+            /** Location */
+            loc: (string | number)[];
+            /** Message */
+            msg: string;
+            /** Error Type */
+            type: string;
+        };
     };
     responses: never;
     parameters: never;
@@ -54,6 +191,97 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    auth_dev_login: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DevLoginRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Me"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    auth_logout: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    auth_me: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Me"];
+                };
+            };
+        };
+    };
+    auth_options: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuthOptions"];
+                };
+            };
+        };
+    };
     health_health: {
         parameters: {
             query?: never;

@@ -21,6 +21,7 @@ Commands exist once the step that adds them is done (see ROADMAP). Run backend c
 - Worker: `uv run gtm worker`
 - Catalog check: `uv run gtm catalog validate`
 - DB migrate: `uv run gtm db upgrade` · `uv run gtm db current` · `uv run gtm db revision -m "msg" --autogenerate` (then review the file it writes)
+- Demo users: `uv run gtm seed dev-users` (idempotent; reads `config/dev_users.yaml`; refuses in production)
 - Frontend: `npm run dev` · `npm run test` · `npm run lint` · `npm run typecheck` · `npm run e2e` (e2e starts its own API on 8000 and Vite on 5173, or reuses ones already running)
 - Regenerate the API client after changing an endpoint: `uv run gtm openapi > ../frontend/openapi.json`, then `npm run gen:api`. Commit `frontend/openapi.json` and `frontend/src/api/schema.d.ts` with the endpoint change: `backend/tests/api/test_openapi_contract.py` fails when they drift.
 - Everything at once (Windows): `powershell -File scripts/dev.ps1` opens the `gtm-api`, `gtm-worker` and `gtm-web` windows and waits until http://localhost:5173 can reach the API. `powershell -File scripts/dev.ps1 -Stop` stops them. It finds `uv` itself, even when `uv` isn't on PATH.

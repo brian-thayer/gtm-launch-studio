@@ -123,11 +123,18 @@ def test_env_file_is_read_and_unknown_keys_are_ignored(
     assert Settings().env == "test"
 
 
+def _hosted_env(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The variables production requires (see tests/api/test_auth.py for the rules themselves)."""
+    monkeypatch.setenv("GTM_AUTH_PROVIDER", "oidc")
+    monkeypatch.setenv("GTM_SESSION_SECRET", "x" * 48)
+
+
 def test_environment_beats_env_file(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     env_file = tmp_path / ".env"
     env_file.write_text("GTM_ENV=test\n", encoding="utf-8")
     monkeypatch.setitem(Settings.model_config, "env_file", env_file)
     monkeypatch.setenv("GTM_ENV", "production")
+    _hosted_env(monkeypatch)
     assert Settings().env == "production"
 
 
@@ -147,6 +154,7 @@ def test_no_caching_between_instances(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("GTM_ENV", "test")
     first = Settings()
     monkeypatch.setenv("GTM_ENV", "production")
+    _hosted_env(monkeypatch)
     second = Settings()
     assert (first.env, second.env) == ("test", "production")
 
