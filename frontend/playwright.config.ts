@@ -1,10 +1,5 @@
 import { defineConfig } from "@playwright/test";
 
-// The backend runs from its own virtualenv (`uv sync` creates backend/.venv), so `npm run e2e` doesn't
-// depend on `uv` being on PATH.
-const backendPython =
-  process.platform === "win32" ? ".venv\\Scripts\\python.exe" : ".venv/bin/python";
-
 // Uses the installed Microsoft Edge. Never run `npx playwright install` (no browser downloads).
 // Keep the ports in step with vite.config.ts and scripts/dev.ps1.
 export default defineConfig({
@@ -19,12 +14,14 @@ export default defineConfig({
   },
   webServer: [
     {
-      // The API on 8000, which the Vite proxy forwards /api to. Never touches Bedrock (mock LLM).
-      command: `${backendPython} -m uvicorn gtm_studio.api.app:create_app --factory --host 127.0.0.1 --port 8000`,
-      cwd: "../backend",
-      env: { GTM_ENV: "test", GTM_LLM_PROVIDER: "mock" },
+      // The API on 8000, which the Vite proxy forwards /api to. e2e/backend.mjs gives it GTM_ENV=test, the
+      // mock LLM (never Bedrock) and a fresh, migrated and seeded storage/e2e.db. It runs from
+      // backend/.venv, so `npm run e2e` doesn't depend on `uv` being on PATH.
+      // With reuseExistingServer, an API already on port 8000 (such as scripts/dev.ps1's) is used as it is.
+      command: "node e2e/backend.mjs",
       url: "http://127.0.0.1:8000/api/health",
       reuseExistingServer: !process.env.CI,
+      timeout: 120_000,
     },
     {
       command: "npm run dev",

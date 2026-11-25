@@ -24,7 +24,7 @@ Commands exist once the step that adds them is done (see ROADMAP). Run backend c
 - Demo users: `uv run gtm seed dev-users` (idempotent; reads `config/dev_users.yaml`; refuses in production)
 - Frontend: `npm run dev` · `npm run test` · `npm run lint` · `npm run typecheck` · `npm run e2e` (e2e starts its own API on 8000 and Vite on 5173, or reuses ones already running)
 - Regenerate the API client after changing an endpoint: `uv run gtm openapi > ../frontend/openapi.json`, then `npm run gen:api`. Commit `frontend/openapi.json` and `frontend/src/api/schema.d.ts` with the endpoint change: `backend/tests/api/test_openapi_contract.py` fails when they drift.
-- Everything at once (Windows): `powershell -File scripts/dev.ps1` opens the `gtm-api`, `gtm-worker` and `gtm-web` windows and waits until http://localhost:5173 can reach the API. `powershell -File scripts/dev.ps1 -Stop` stops them. It finds `uv` itself, even when `uv` isn't on PATH.
+- Everything at once (Windows): `powershell -File scripts/dev.ps1` migrates the database, seeds the demo users (so the login page has someone to sign in as), opens the `gtm-api`, `gtm-worker` and `gtm-web` windows and waits until http://localhost:5173 can reach the API. `powershell -File scripts/dev.ps1 -Stop` stops them. It finds `uv` itself, even when `uv` isn't on PATH.
 
 ## Invariants (breaking one is a blocking review finding)
 1. **Code decides, the LLM drafts.** The lifecycle, planner, gating and state transitions are deterministic Python. An LLM never decides what ships or when.

@@ -59,10 +59,13 @@ type ApiResult<D> =
  * so a failure becomes the query's `error`:
  *
  *     queryFn: async () => unwrap(await api.GET("/api/health"))
+ *
+ * openapi-fetch types the error branch as `data?: never`, which makes `D` infer as `Data | undefined`.
+ * That `undefined` is the failure case, which has just thrown, so it is taken out of the return type.
  */
-export function unwrap<D>(result: ApiResult<D>): D {
+export function unwrap<D>(result: ApiResult<D>): Exclude<D, undefined> {
   if (!result.response.ok) throw new ApiError(result.response.status, result.error);
-  return result.data as D;
+  return result.data as Exclude<D, undefined>;
 }
 
 function describeError(status: number, body: unknown): string {

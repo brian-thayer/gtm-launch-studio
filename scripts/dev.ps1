@@ -4,7 +4,7 @@
 
 .DESCRIPTION
   Default: warns and exits if the ports are busy, runs `uv run gtm db upgrade` once that command exists
-  (S05), opens one window each for gtm-api, gtm-worker and gtm-web, waits until they answer, and prints
+  (S05) and `gtm seed dev-users` so the login page has users, opens one window each for gtm-api, gtm-worker and gtm-web, waits until they answer, and prints
   the URLs.
   -Stop: stops the windows this script opened, plus whatever still listens on 8000 or 5173 (with its
   child processes).
@@ -136,6 +136,13 @@ try {
         & uv run gtm db upgrade
         if ($LASTEXITCODE -ne 0) {
             Write-Error 'gtm db upgrade failed. Nothing was started.'
+            exit 1
+        }
+        # The login page lists these demo users (config/dev_users.yaml). Idempotent; it refuses GTM_ENV=production.
+        Write-Host 'Seeding the dev users...'
+        & uv run gtm seed dev-users
+        if ($LASTEXITCODE -ne 0) {
+            Write-Error 'gtm seed dev-users failed. Nothing was started.'
             exit 1
         }
     }

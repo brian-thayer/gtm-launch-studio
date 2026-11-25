@@ -22,7 +22,7 @@ Status values: `todo` · `in progress` · `done` · `blocked`. **Human** marks s
 | S05 | Database foundation (SQLAlchemy 2, Alembic, SQLite WAL, test fixtures) | done | S04 | |
 | S06 | Users, roles, permissions, dev login, sessions | done | S05 | |
 | S07 | Audit log, request IDs, structured logging, activity API | done | S06 | |
-| S08 | Frontend login, app shell, protected routes, Activity page | todo | S04, S07 | |
+| S08 | Frontend login, app shell, protected routes, Activity page | done | S04, S07 | |
 | S09 | OIDC provider skeleton, hosting notes, security review | todo | S07 | |
 | — | **/review-milestone M1** (Opus) | todo | S02–S09 | |
 

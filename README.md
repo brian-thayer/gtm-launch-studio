@@ -96,4 +96,4 @@ powershell -File scripts/dev.ps1          # API, worker and web, each in its own
 powershell -File scripts/dev.ps1 -Stop    # stop them
 ```
 
-It refuses to start if ports 8000 or 5173 are in use, waits until the frontend can reach the API, then prints the URLs. The home page shows an "API: ok" badge when the whole chain works. `uv` doesn't have to be on PATH: the script finds it in `%APPDATA%\Python\Python3*\Scripts`.
+It refuses to start if ports 8000 or 5173 are in use, migrates the database and seeds the demo users, waits until the frontend can reach the API, then prints the URLs. Open http://localhost:5173 and pick a demo user on the login page; the home page then shows an "API: ok" badge when the whole chain works. `uv` doesn't have to be on PATH: the script finds it in `%APPDATA%\Python\Python3*\Scripts`.
