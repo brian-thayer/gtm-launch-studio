@@ -49,10 +49,9 @@ def test_seed_dev_users_needs_a_migrated_database() -> None:
     assert "gtm db upgrade" in result.output
 
 
+@pytest.mark.usefixtures("hosted_env")
 def test_seed_dev_users_refuses_production(migrated_engine: Engine, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("GTM_ENV", "production")
-    monkeypatch.setenv("GTM_AUTH_PROVIDER", "oidc")
-    monkeypatch.setenv("GTM_SESSION_SECRET", "p" * 48)
     result = runner.invoke(app, ["seed", "dev-users"])
     assert result.exit_code == 1
     assert "production" in result.output

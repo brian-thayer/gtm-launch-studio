@@ -58,7 +58,8 @@ Configuration comes from `GTM_*` environment variables, or from a git-ignored `b
 | Variable | Default | Meaning |
 |---|---|---|
 | `GTM_ENV` | `dev` | `dev`, `test` or `production`. Production turns off the interactive API docs, marks the session cookie `Secure`, and refuses to start with the dev login or the built-in session secret. |
-| `GTM_AUTH_PROVIDER` | `dev` | `dev` (pick a seeded user, no password) or `oidc` (S09). Must be `oidc` in production. |
+| `GTM_AUTH_PROVIDER` | `dev` | `dev` (pick a seeded user, no password) or `oidc` (sign in through Entra ID, Okta or another OpenID Connect provider; see `docs/hosting.md`). Must be `oidc` in production. |
+| `GTM_OIDC_ISSUER`, `GTM_OIDC_CLIENT_ID`, `GTM_OIDC_CLIENT_SECRET`, `GTM_OIDC_REDIRECT_URL` | unset | Required when the provider is `oidc`. Also `GTM_OIDC_SCOPES`, `GTM_OIDC_GROUP_CLAIM`, `GTM_OIDC_ROLE_MAP_PATH` (default `oidc_roles.yaml` in `GTM_CONFIG_DIR`, copied from `config/oidc_roles.example.yaml`) and `GTM_FRONTEND_BASE_URL` (default `http://localhost:5173`). In production every URL must be https. |
 | `GTM_SESSION_SECRET` | built-in dev value | Signs the session cookie. Required in production: at least 32 random characters. |
 | `GTM_DB_URL` | `sqlite:///<repo>/storage/gtm_studio.db` | SQLAlchemy URL. A relative SQLite path resolves against the repo root. |
 | `GTM_STORAGE_DIR` | `<repo>/storage` | Local runtime data. |

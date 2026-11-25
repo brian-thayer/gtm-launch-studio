@@ -18,6 +18,9 @@ dependencies = [
     "alembic>=1.20.1",
     "itsdangerous>=2.2.0",
     "pyyaml>=6.0.4",
+    "authlib>=1.9.10",  # auth/oidc.py: the OIDC authorization-code flow
+    "httpx2>=2.16",  # authlib's HTTP client (it prefers httpx2 and warns when it falls back to httpx)
+    "joserfc>=1.8",
 ]
 
 [project.scripts]
@@ -26,7 +29,6 @@ gtm = "gtm_studio.cli:app"
 [dependency-groups]
 dev = [
     "pytest>=8.3",
-    "httpx2>=2.16",  # Starlette 1.10's TestClient wants httpx2 and deprecates plain httpx
     "ruff>=0.8",
     "pyright>=1.1.390",
     "import-linter>=2.1",
@@ -115,6 +117,8 @@ forbidden_modules = [
     "boto3",
     "httpx",
     "httpx2",
+    "authlib",
+    "joserfc",
     "gtm_studio.settings",
 ]
 
@@ -122,4 +126,4 @@ forbidden_modules = [
 name = "Services take ports, not web or cloud SDKs"
 type = "forbidden"
 source_modules = ["gtm_studio.services"]
-forbidden_modules = ["fastapi", "starlette", "anthropic", "boto3"]
+forbidden_modules = ["fastapi", "starlette", "anthropic", "boto3", "authlib", "joserfc", "httpx", "httpx2"]

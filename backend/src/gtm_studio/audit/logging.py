@@ -18,10 +18,11 @@ from structlog.typing import Processor
 
 from gtm_studio.settings import Settings
 
-# Libraries that log request URLs (query strings included), SQL parameters or message bodies once the level
-# is INFO or DEBUG. They stay at WARNING whatever GTM_LOG_LEVEL says: prompts, document text and tokens
-# must not reach the logs (backend/CLAUDE.md).
+# Libraries that log request URLs (query strings included), SQL parameters, message bodies or tokens once the
+# level is INFO or DEBUG. They stay at WARNING whatever GTM_LOG_LEVEL says: prompts, document text and tokens
+# must not reach the logs (backend/CLAUDE.md). authlib logs the PKCE code verifier at DEBUG.
 QUIET_LIBRARIES = (
+    "authlib",
     "httpx",
     "httpx2",
     "httpcore",

@@ -1,6 +1,6 @@
 # S09: OIDC provider skeleton, hosting notes, M1 security review
 
-Status: todo
+Status: done
 Milestone: M1
 Depends on: S06, S07 (S08 for the manual login-button check)
 Human in the loop: no. There's no real IdP yet; everything is mocked.
@@ -70,3 +70,27 @@ Then `/security-review`.
 - A user admin UI.
 
 ## Notes
+Deviations from the card, each with the reason:
+- **`httpx2`, not `httpx`.** authlib 1.9 imports `httpx2` first and falls back to `httpx` with a deprecation warning, so `httpx2` moved from the dev group to the runtime dependencies and plain `httpx` was removed. `joserfc` (authlib's JWT library, whose errors the callback catches) is declared directly. `authlib`, `httpx` and `httpx2` are forbidden in `services/` and `domain/` by import-linter.
+- **`handle_callback` returns `OidcSignIn(actor, roles_synced, next_path)`, not an `Actor`**, so the route can audit `roles_synced` and redirect without a second lookup.
+- **An inactive user is refused before their roles are synced** (the card lists the check last). A switched-off account must stay exactly as it was left. `upsert_oidc_user` also returns an inactive user untouched, and checks that before the email-conflict check, so the reason audited is always `inactive`.
+- **Never link by email.** An IdP email that already belongs to a different user is a denial (`email_conflict`), not a match. Recorded in the ADR-0002 addendum.
+- **Only refusals of someone the IdP vouched for are audited.** Failures before that (bad `state`, refused code, invalid token) are logged and redirect to `/login?error=failed`. The callback is open to anyone and audit rows can't be deleted, so auditing them would let an anonymous caller grow the table (the S07 follow-up on unthrottled failed sign-ins). Rate limits at the proxy are in `docs/hosting.md`.
+- **New audit actions** `user.provisioned`, `user.updated` and `user.roles_synced` (the card only names `auth.login` / `auth.login_denied`): invariant 3 requires an audit row for provisioning and role changes, in the same unit of work. `record_login` takes `roles_synced`; `record_login_denied` takes a `reason`.
+- **A failed or refused sign-in redirects to `<frontend>/login?error=denied|failed`** (the card doesn't say). The two OIDC routes are added to `OPEN_ROUTES` in `tests/api/test_auth.py`, like dev login: they are how a session starts. `tests/api/test_app.py` now exempts 302 as well as 204 from "has a `response_model`".
+- **Production settings also require https** for the issuer, redirect URL and frontend URL (the client secret and the `Secure` cookie make http pointless), and reject a non-URL issuer. `oidc_role_map_path` is optional and defaults to `oidc_roles.yaml` in `config_dir`.
+- **`config/oidc_roles.yaml` is git-ignored** (the example is committed): it holds deployment-specific group IDs.
+- **The tests fake the IdP with a really signed ID token** (`FakeIdp`), replacing only authlib's `load_server_metadata` and `fetch_access_token`, instead of replacing `authorize_access_token` as the card suggests. State, nonce, PKCE, signature, `iss`, `aud` and `exp` are therefore checked by authlib itself.
+- **Size:** about 650 lines of source and 1,100 of tests against a budget of about 450; the rest is the fake IdP, the refusal cases and the settings tests.
+- Fixed from the reviewer's first pass: `authlib` added to `QUIET_LIBRARIES` (it logs the PKCE verifier at DEBUG; the existing quiet-libraries test covers it); the role-map path follows `config_dir`.
+
+Security review (all of M1, S02 to S09; discovery by a read-only agent that read the source, then the installed authlib, joserfc and Starlette code): **no high or medium findings**, so there was nothing to fix or to record as a blocker. Confirmed: `state`, nonce and PKCE are enforced and single-use; a token response without an `id_token` signs nobody in; the signing algorithms are pinned (no `none`, no HS256 confusion); people are matched by `(oidc, sub)` only; the OIDC role sync can't touch other sources' grants and inactive roles grant nothing; `next` can't change the redirect host; every route outside the five open ones needs `current_actor`; an anonymous caller can't write audit rows in OIDC mode; no SQL is built from input; YAML is `safe_load`ed. Considered and left alone: logout doesn't invalidate a stolen cookie (needs a prior theft; sessions end after 8 hours); the dev provider is open to DNS rebinding (dev only, refused in production); an IdP user who registers a colleague's email before the colleague signs in locks the colleague out with `email_conflict` (a denial, not a takeover, and an admin can resolve it); `default_roles: [viewer]` gives every IdP-authenticated user read access (in Entra, set *Assignment required*; `docs/hosting.md` says so). authlib's `aud` handling goes through the `azp` rule rather than a plain membership check, which isn't exploitable because ID tokens only arrive over the back channel, authenticated with our client secret.
+
+Follow-ups:
+- **Frontend (S08 files):** the "Sign in with SSO" link should pass `?next=<the page asked for>`, and the login page should show a message for `?error=denied` and `?error=failed`. Today the backend supports both and the UI uses neither.
+- **S15:** catalog role sync must activate a role that OIDC created inactive (note added to that card).
+- **S33 / later:** concurrent sign-ins can hit a unique constraint and answer 500: two first sign-ins for one `sub` (two tabs), two sign-ins for one user inserting the same `(user_id, role_key)` grant, or two users whose first sign-ins both create the same new role. Nobody is signed in by the failing request and a retry works, but handling `IntegrityError` (re-read, then continue) would make it clean. It needs the S33 transaction work (`BEGIN IMMEDIATE`).
+- **Reviewer nits left as they are:** `options` returns `dev_users: []` in OIDC mode (the frontend relies on that shape); the size budget was exceeded (see above).
+- **Decision recorded in the ADR-0002 addendum:** denials with no user record store the IdP subject as the audit `entity_id` under entity type `user`.
+- **S47:** rate limits on the open sign-in routes, TLS and proxy headers, and the Postgres `REVOKE` for `audit_events` are described in `docs/hosting.md` and need to be applied and tested in the hosted deployment. The OIDC flow has not been run against a real IdP (out of scope here): do that, with the checklist in `docs/hosting.md`, as soon as IT provides an app registration.
+- **Manual check when a real IdP exists:** open the site signed out, click *Sign in with SSO*, sign in, and confirm you land on the home page and see `auth.login` (with `roles_synced`) on the Activity page.

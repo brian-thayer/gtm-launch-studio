@@ -226,6 +226,8 @@ def test_libraries_that_log_urls_and_sql_parameters_stay_quiet(
     logging.getLogger("httpx2").debug("sending GET https://x.test/?token=hunter2")
     logging.getLogger("sqlalchemy.engine").info("INSERT ... [parameters: ('prompt text',)]")
     logging.getLogger("anthropic._base_client").debug("Request options: {'json_data': 'prompt text'}")
+    # authlib's own wording: the PKCE verifier is a secret until the code is exchanged.
+    logging.getLogger("authlib.integrations.base_client.sync_app").debug("Using code_verifier: 'hunter2'")
     logging.getLogger("some.library").info("our own code and others still log")
     logging.getLogger("httpx").warning("but a warning from them does")
     events = [json.loads(line)["event"] for line in capsys.readouterr().err.splitlines()]

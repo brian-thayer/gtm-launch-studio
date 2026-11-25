@@ -31,8 +31,9 @@ class IdentityRepository(Protocol):
         """Create the user, or overwrite the one with the same ID. Does not touch roles or last login."""
         ...
 
-    def ensure_role(self, key: str, label: str, source: RoleSource) -> bool:
-        """Create the role if it doesn't exist. True when it was created."""
+    def ensure_role(self, key: str, label: str, source: RoleSource, *, active: bool = True) -> bool:
+        """Create the role if it doesn't exist. True when it was created. An existing role is left as it
+        is, whatever ``active`` says."""
         ...
 
     def set_roles(
@@ -40,6 +41,14 @@ class IdentityRepository(Protocol):
     ) -> None:
         """Make the user hold exactly these roles. Every role must exist. Grants that stay keep their
         original ``granted_at``."""
+        ...
+
+    def sync_source_roles(
+        self, user_id: str, role_keys: Collection[str], *, source: RoleSource
+    ) -> tuple[frozenset[str], frozenset[str]]:
+        """Make the grants that came from ``source`` match ``role_keys``, and leave every other grant
+        alone. A role the user already holds from another source is not granted a second time (so it also
+        stays when ``source`` stops asking for it). Every role must exist. Returns ``(added, removed)``."""
         ...
 
     def set_last_login(self, user_id: str, at: datetime) -> None: ...

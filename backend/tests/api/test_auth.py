@@ -25,7 +25,15 @@ GOOD_SECRET = "s" * 48
 
 # ------------------------------------------------------------------ the route guard (stays forever)
 
-OPEN_ROUTES = {"/api/health", "/api/auth/options", "/api/auth/dev/login"}
+# Open because they are how a session starts (or, for health and options, what a signed-out page needs).
+# The OIDC pair change nothing until the identity provider has vouched for someone (tests/api/test_oidc.py).
+OPEN_ROUTES = {
+    "/api/health",
+    "/api/auth/options",
+    "/api/auth/dev/login",
+    "/api/auth/oidc/login",
+    "/api/auth/oidc/callback",
+}
 
 
 def _requires_a_session(dependant: Dependant) -> bool:
@@ -278,11 +286,6 @@ def test_a_login_without_the_csrf_header_does_not_sign_in(client: TestClient, se
 # ------------------------------------------------------------------ the provider switch
 
 
-@pytest.fixture
-def oidc_settings(settings: Settings) -> Settings:
-    return settings.model_copy(update={"auth_provider": "oidc"})
-
-
 def test_dev_login_is_disabled_when_the_provider_is_oidc(
     oidc_settings: Settings, seeded: SeedSummary
 ) -> None:
@@ -319,8 +322,9 @@ def test_production_refuses_a_short_session_secret() -> None:
         Settings(env="production", auth_provider="oidc", session_secret=SecretStr("short"))
 
 
+@pytest.mark.usefixtures("hosted_env")
 def test_production_accepts_oidc_with_a_real_secret() -> None:
-    s = Settings(env="production", auth_provider="oidc", session_secret=SecretStr(GOOD_SECRET))
+    s = Settings(env="production")
     assert (s.env, s.auth_provider) == ("production", "oidc")
 
 
@@ -332,19 +336,23 @@ def test_the_defaults_are_the_dev_provider_and_the_public_secret() -> None:
     assert (defaults.env, defaults.auth_provider) == ("dev", "dev")
 
 
+@pytest.mark.usefixtures("hosted_env")
 def test_production_is_refused_from_the_environment(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("GTM_ENV", "production")
+    monkeypatch.setenv("GTM_AUTH_PROVIDER", "dev")
     with pytest.raises(ValidationError):
         Settings()
     monkeypatch.setenv("GTM_AUTH_PROVIDER", "oidc")
-    monkeypatch.setenv("GTM_SESSION_SECRET", GOOD_SECRET)
     assert Settings().env == "production"
 
 
-def test_the_session_secret_is_not_shown_in_a_repr() -> None:
-    s = Settings(env="production", auth_provider="oidc", session_secret=SecretStr(GOOD_SECRET))
-    assert GOOD_SECRET not in repr(s)
-    assert GOOD_SECRET not in str(s)
+@pytest.mark.usefixtures("hosted_env")
+def test_secrets_are_not_shown_in_a_repr() -> None:
+    s = Settings(env="production", session_secret=SecretStr(GOOD_SECRET))
+    assert s.oidc_client_secret is not None
+    for secret in (GOOD_SECRET, s.oidc_client_secret.get_secret_value()):
+        assert secret not in repr(s)
+        assert secret not in str(s)
 
 
 def test_the_built_in_secret_logs_a_warning_when_serving_in_dev(settings: Settings) -> None:

@@ -1,5 +1,6 @@
-"""Ways to sign in. ``DevAuthProvider`` lists the seeded users; the OIDC provider arrives in S09
-(ADR-0002). A provider never starts a session itself: the route does, once a provider vouches for someone."""
+"""Ways to sign in. ``DevAuthProvider`` lists the seeded users; ``OidcAuthProvider`` (``auth/oidc.py``)
+signs people in through an identity provider (ADR-0002). A provider never starts a session itself: the
+route does, once a provider vouches for someone."""
 
 from typing import Any, Protocol
 

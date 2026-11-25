@@ -8,7 +8,8 @@ below, the approver roles a catalog declares (S15), and the dev seed. Whatever i
 is a separate question, answered by ``can_approve`` from the gate's ``approver_roles``.
 """
 
-from collections.abc import Collection, Iterable
+import re
+from collections.abc import Collection, Iterable, Mapping
 from dataclasses import dataclass
 from datetime import datetime
 from enum import StrEnum
@@ -20,6 +21,9 @@ RoleSource = Literal["system", "dev_seed", "catalog", "oidc"]
 ADMIN_ROLE = "admin"
 VIEWER_ROLE = "viewer"
 SYSTEM_ROLES: frozenset[str] = frozenset({ADMIN_ROLE, VIEWER_ROLE})
+
+ROLE_KEY = re.compile(r"[a-z][a-z0-9_]{0,49}")
+"""What a role key may look like (``roles.key`` is 50 characters)."""
 
 
 class Permission(StrEnum):
@@ -86,6 +90,24 @@ class UserRecord:
 
     def to_actor(self) -> Actor:
         return Actor(id=self.id, email=self.email, display_name=self.display_name, roles=self.roles)
+
+
+@dataclass(frozen=True)
+class OidcRoleMap:
+    """Which roles an identity provider's groups give (``config/oidc_roles.yaml``).
+
+    A group is matched exactly (case-sensitive), by whatever the IdP puts in its groups claim: a name for
+    Okta, usually an object ID for Entra ID. A person in no mapped group gets ``default_roles``.
+    """
+
+    group_to_roles: Mapping[str, frozenset[str]]
+    default_roles: frozenset[str]
+
+    def roles_for(self, groups: Iterable[str]) -> frozenset[str]:
+        mapped: set[str] = set()
+        for group in groups:
+            mapped |= self.group_to_roles.get(group, frozenset())
+        return frozenset(mapped) or self.default_roles
 
 
 def can_approve(actor: Actor, approver_roles: Collection[str]) -> bool:

@@ -25,6 +25,10 @@ class AuditAction(StrEnum):
     AUTH_LOGIN = "auth.login"
     AUTH_LOGOUT = "auth.logout"
     AUTH_LOGIN_DENIED = "auth.login_denied"  # an unknown or inactive user tried to sign in (no actor)
+    # Written by the identity provider's sign-in (no actor: nobody is signed in yet; the entity is the user).
+    USER_PROVISIONED = "user.provisioned"  # first sign-in through OIDC created the user
+    USER_UPDATED = "user.updated"  # the IdP reported a new email or display name
+    USER_ROLES_SYNCED = "user.roles_synced"  # the IdP's groups changed the user's role grants
 
 
 def canonical_hash(obj: Any) -> str:

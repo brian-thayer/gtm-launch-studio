@@ -1,22 +1,23 @@
 """Identity use cases: seeding the development users, resolving a session to an ``Actor``, and recording
 logins. Services see only the ports in ``services/ports.py``."""
 
-import re
 import uuid
-from collections.abc import Callable
-from dataclasses import dataclass
+from collections.abc import Callable, Collection
+from dataclasses import dataclass, replace
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+import structlog
 import yaml
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator
 
 from gtm_studio.domain.audit import AuditAction
-from gtm_studio.domain.identity import Actor, AuthProviderName, UserRecord
+from gtm_studio.domain.identity import ROLE_KEY, Actor, AuthProviderName, RoleSource, UserRecord
 from gtm_studio.services.ports import UnitOfWorkFactory
 
-_ROLE_KEY = re.compile(r"[a-z][a-z0-9_]{0,49}")
+log = structlog.get_logger()
+
 USER_ENTITY = "user"  # audit_events.entity_type for a user
 
 
@@ -47,7 +48,7 @@ class DevUserSeed(BaseModel):
     @classmethod
     def _role_keys(cls, value: list[str]) -> list[str]:
         for key in value:
-            if not _ROLE_KEY.fullmatch(key):
+            if not ROLE_KEY.fullmatch(key):
                 raise ValueError(f"role key {key!r} must be lowercase letters, digits and underscores")
         return list(dict.fromkeys(value))
 
@@ -66,9 +67,23 @@ class SeedSummary:
     roles_created: int
 
 
+@dataclass(frozen=True)
+class RoleSync:
+    """What ``IdentityService.sync_roles`` changed."""
+
+    added: frozenset[str]
+    removed: frozenset[str]
+
+
 class SeedError(Exception):
     """The seed file can't be used (unreadable, malformed, or in conflict with an existing user). The
     message is meant for the person running ``gtm seed dev-users``."""
+
+
+class UserConflictError(Exception):
+    """An identity provider reported an email that already belongs to a different user. People are never
+    matched by email (a mutable, sometimes unverified claim): taking over an account that way is how a
+    hostile IdP tenant or a renamed mailbox would get someone else's roles."""
 
 
 def load_dev_users(path: Path) -> list[DevUserSeed]:
@@ -134,25 +149,115 @@ class IdentityService:
         with self._uow_factory() as uow:
             return uow.identity.list_active_users()
 
-    def record_login(self, actor: Actor, provider: AuthProviderName) -> None:
-        """A person signed in: stamp their last login and audit it, in one transaction."""
+    def upsert_oidc_user(self, *, subject: str, email: str, display_name: str) -> UserRecord:
+        """The user an identity provider vouches for, created on the first sign-in (just-in-time) and
+        kept in step with the IdP's email and name afterwards. People are found by ``(oidc, subject)``
+        only. Raises ``UserConflictError`` when the email is already another user's.
+
+        A deactivated user is returned as they are: nothing about them changes, so an account an admin
+        switched off stays exactly as it was left. The caller refuses the sign-in."""
+        email = email.strip().lower()
+        with self._uow_factory() as uow:
+            repo = uow.identity
+            existing = repo.get_user_by_subject("oidc", subject)
+            if existing is not None and not existing.is_active:
+                return existing  # checked first: whatever else is off, the refusal is for being inactive
+            owner = repo.get_user_by_email(email)
+            if owner is not None and (existing is None or owner.id != existing.id):
+                raise UserConflictError(f"{email} already belongs to a different user")
+            if existing is None:
+                created = UserRecord(
+                    id=str(uuid.uuid4()),
+                    email=email,
+                    display_name=display_name,
+                    is_active=True,
+                    auth_provider="oidc",
+                    auth_subject=subject,
+                    roles=frozenset(),
+                )
+                repo.upsert_user(created)
+                uow.audit.record(
+                    None, AuditAction.USER_PROVISIONED, USER_ENTITY, created.id, details={"provider": "oidc"}
+                )
+                return created
+            if (existing.email, existing.display_name) == (email, display_name):
+                return existing
+            updated = replace(existing, email=email, display_name=display_name)
+            repo.upsert_user(updated)
+            uow.audit.record(
+                None,
+                AuditAction.USER_UPDATED,
+                USER_ENTITY,
+                existing.id,
+                details={"provider": "oidc", "fields": _changed_profile_fields(existing, updated)},
+                before={"email": existing.email, "display_name": existing.display_name},
+                after={"email": updated.email, "display_name": updated.display_name},
+            )
+            return updated
+
+    def sync_roles(self, user_id: str, role_keys: Collection[str], source: RoleSource) -> RoleSync:
+        """Make the user's grants from ``source`` exactly ``role_keys``. Grants from any other source are
+        untouched, so a role an admin gave someone by hand outlives the IdP no longer asking for it.
+
+        A key no role row exists for yet (for example an approver role the catalog hasn't declared) is
+        created **inactive** and logged: an inactive role grants nothing, so a typo or an early mapping in
+        the IdP config never hands out access by accident. Raises ``ValueError`` for a malformed key."""
+        wanted = sorted(set(role_keys))
+        for key in wanted:
+            if not ROLE_KEY.fullmatch(key):
+                raise ValueError(f"role key {key!r} must be lowercase letters, digits and underscores")
+        with self._uow_factory() as uow:
+            repo = uow.identity
+            for key in wanted:
+                if repo.ensure_role(key, label=key, source=source, active=False):
+                    log.warning("created an inactive role: nothing declares it yet", role=key, source=source)
+            added, removed = repo.sync_source_roles(user_id, wanted, source=source)
+            if added or removed:
+                uow.audit.record(
+                    None,
+                    AuditAction.USER_ROLES_SYNCED,
+                    USER_ENTITY,
+                    user_id,
+                    details={"source": source, "added": sorted(added), "removed": sorted(removed)},
+                )
+        return RoleSync(added=added, removed=removed)
+
+    def record_login(
+        self, actor: Actor, provider: AuthProviderName, *, roles_synced: Collection[str] | None = None
+    ) -> None:
+        """A person signed in: stamp their last login and audit it, in one transaction. ``roles_synced``
+        is what the identity provider's groups mapped to (OIDC only)."""
+        details: dict[str, Any] = {"provider": provider}
+        if roles_synced is not None:
+            details["roles_synced"] = sorted(roles_synced)
         with self._uow_factory() as uow:
             uow.identity.set_last_login(actor.id, self._clock())
-            uow.audit.record(
-                actor, AuditAction.AUTH_LOGIN, USER_ENTITY, actor.id, details={"provider": provider}
-            )
+            uow.audit.record(actor, AuditAction.AUTH_LOGIN, USER_ENTITY, actor.id, details=details)
 
     def record_logout(self, actor: Actor) -> None:
         with self._uow_factory() as uow:
             uow.audit.record(actor, AuditAction.AUTH_LOGOUT, USER_ENTITY, actor.id)
 
-    def record_login_denied(self, user_id: str, provider: AuthProviderName) -> None:
+    def record_login_denied(
+        self, user_id: str, provider: AuthProviderName, reason: str | None = None
+    ) -> None:
         """Someone tried to sign in as a user who doesn't exist or is inactive. There is no actor; the
-        user ID they tried is the entity (the login schema caps it at 36 characters)."""
+        user ID they tried is the entity (at most 100 characters). ``reason`` is a short code, never free
+        text from the request."""
+        details: dict[str, Any] = {"provider": provider}
+        if reason is not None:
+            details["reason"] = reason
         with self._uow_factory() as uow:
-            uow.audit.record(
-                None, AuditAction.AUTH_LOGIN_DENIED, USER_ENTITY, user_id, details={"provider": provider}
-            )
+            uow.audit.record(None, AuditAction.AUTH_LOGIN_DENIED, USER_ENTITY, user_id, details=details)
+
+
+def _changed_profile_fields(before: UserRecord, after: UserRecord) -> list[str]:
+    fields: list[str] = []
+    if before.email != after.email:
+        fields.append("email")
+    if before.display_name != after.display_name:
+        fields.append("display_name")
+    return fields
 
 
 def _same_user(a: UserRecord, b: UserRecord) -> bool:

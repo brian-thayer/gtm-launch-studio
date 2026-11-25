@@ -32,7 +32,8 @@ def test_every_route_is_under_the_api_prefix(api_routes: list[RouteInfo]) -> Non
 def test_every_api_route_declares_a_response_model_and_a_tag(api_routes: list[RouteInfo]) -> None:
     routes = [r.route for r in api_routes if r.route is not None]
     assert routes
-    assert [r.path for r in routes if r.response_model is None and r.status_code != 204] == []
+    # 204 and 302 have no body to describe (the OIDC login and callback redirect the browser).
+    assert [r.path for r in routes if r.response_model is None and r.status_code not in (204, 302)] == []
     assert [r.path for r in routes if not r.tags] == []
 
 

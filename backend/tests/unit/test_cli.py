@@ -72,10 +72,9 @@ def test_openapi_stdout_stays_json_with_logging_configured(monkeypatch: pytest.M
     assert structlog.is_configured()  # the Typer callback did it
 
 
+@pytest.mark.usefixtures("hosted_env")
 def test_commands_configure_logging_from_the_settings(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("GTM_ENV", "production")
-    monkeypatch.setenv("GTM_AUTH_PROVIDER", "oidc")
-    monkeypatch.setenv("GTM_SESSION_SECRET", "s" * 48)
     result = runner_cli.invoke(app, ["worker", "--once"])
     assert result.exit_code == 0
     [line] = [json.loads(entry) for entry in result.stderr.splitlines()]  # JSON outside dev

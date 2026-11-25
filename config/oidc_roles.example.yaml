@@ -1,0 +1,24 @@
+# Which roles each identity-provider group gives (GTM_AUTH_PROVIDER=oidc). Copy this file to
+# `oidc_roles.yaml` (or point GTM_OIDC_ROLE_MAP_PATH at another file) and edit it. It is read when the API
+# starts, so a change needs a restart.
+#
+# Keys under `group_to_roles` are matched exactly (case-sensitive) against the values in the ID token's
+# groups claim (GTM_OIDC_GROUP_CLAIM, "groups" by default):
+#   - Okta: the group name, as the groups claim is configured to emit it.
+#   - Entra ID: the group's object ID (a GUID), unless the app emits names (cloud-only groups).
+# A person in several mapped groups gets the union of their roles. A person in none gets `default_roles`.
+#
+# Roles are lowercase letters, digits and underscores. `admin` and `viewer` are system roles; every other
+# role is an approver role, normally one the catalog declares in gtm_catalog/lifecycle.yaml. A role that
+# nothing declares yet is created *inactive* on first use (logged as a warning) and grants nothing until
+# the catalog declares it.
+#
+# Roles given here are synced at every sign-in: they are added and removed to match the groups. Roles an
+# admin granted another way are never touched.
+group_to_roles:
+  "<IdP group name or object ID>": [pmm]
+  "<another group>": [product, cs]
+
+# Given to people who sign in but are in no mapped group. [] means such people can sign in but can do
+# nothing; `viewer` gives them read-only access.
+default_roles: [viewer]

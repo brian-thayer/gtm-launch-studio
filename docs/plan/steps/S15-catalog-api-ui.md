@@ -82,3 +82,4 @@ Manual: `scripts/dev.ps1`. Log in as the admin, open the Catalog, edit a prompt 
 - Using the catalog in generation (M4/M5).
 
 ## Notes
+- **From S09:** the OIDC sign-in creates a mapped role that nothing declares yet as `source=oidc, active=false` (`IdentityService.sync_roles`), so a typo in `config/oidc_roles.yaml` can't grant access. `sync_roles()` here must treat such a row like a `dev_seed` one: when its key matches a catalog role, make it `source=catalog, active=true` (the user's existing `oidc` grants then take effect on their next request). Cover it with a test. A catalog-sourced role that is later removed becomes inactive again, and OIDC users keep the grant row for history.

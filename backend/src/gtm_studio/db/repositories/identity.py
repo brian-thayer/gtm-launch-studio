@@ -45,10 +45,10 @@ class SqlIdentityRepository:
         row.auth_subject = user.auth_subject
         self._session.flush()
 
-    def ensure_role(self, key: str, label: str, source: RoleSource) -> bool:
+    def ensure_role(self, key: str, label: str, source: RoleSource, *, active: bool = True) -> bool:
         if self._session.get(Role, key) is not None:
             return False
-        self._session.add(Role(key=key, label=label, source=source, active=True))
+        self._session.add(Role(key=key, label=label, source=source, active=active))
         self._session.flush()
         return True
 
@@ -66,6 +66,27 @@ class SqlIdentityRepository:
                 UserRole(user_id=user_id, role_key=key, granted_by_user_id=granted_by, source=source)
             )
         self._session.flush()
+
+    def sync_source_roles(
+        self, user_id: str, role_keys: Collection[str], *, source: RoleSource
+    ) -> tuple[frozenset[str], frozenset[str]]:
+        wanted = set(role_keys)
+        rows = self._session.execute(
+            select(UserRole.role_key, UserRole.source).where(UserRole.user_id == user_id)
+        )
+        grants = {role_key: granted_from for role_key, granted_from in rows}  # role -> where it came from
+        removed = {
+            key for key, granted_from in grants.items() if granted_from == source and key not in wanted
+        }
+        added = wanted - grants.keys()
+        if removed:
+            self._session.execute(
+                delete(UserRole).where(UserRole.user_id == user_id, UserRole.role_key.in_(removed))
+            )
+        for key in sorted(added):
+            self._session.add(UserRole(user_id=user_id, role_key=key, granted_by_user_id=None, source=source))
+        self._session.flush()
+        return frozenset(added), frozenset(removed)
 
     def set_last_login(self, user_id: str, at: datetime) -> None:
         row = self._session.get_one(User, user_id)

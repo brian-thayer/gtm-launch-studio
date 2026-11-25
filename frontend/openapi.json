@@ -697,6 +697,69 @@
         ]
       }
     },
+    "/api/auth/oidc/callback": {
+      "get": {
+        "description": "Where the identity provider sends the browser back. On success: start the session, audit\n`auth.login` (with the roles the groups mapped to) and redirect to the frontend page asked for. A\nrefused person is audited (`auth.login_denied`, with a reason); any failure redirects to\n`/login?error=denied|failed` and signs nobody in.",
+        "operationId": "auth_oidc_callback",
+        "responses": {
+          "302": {
+            "description": "Successful Response"
+          },
+          "404": {
+            "description": "OIDC is not the configured provider"
+          }
+        },
+        "summary": "Oidc Callback",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/auth/oidc/login": {
+      "get": {
+        "description": "Start the OIDC sign-in: redirect the browser to the identity provider. Open by nature (it is how\na session starts), but it changes nothing: ``state`` and the PKCE verifier go in the caller's own\ncookie. ``next`` is checked now and again at the callback.",
+        "operationId": "auth_oidc_login",
+        "parameters": [
+          {
+            "description": "Same-site path to return to; else `/`",
+            "in": "query",
+            "name": "next",
+            "required": false,
+            "schema": {
+              "default": "/",
+              "description": "Same-site path to return to; else `/`",
+              "title": "Next",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "302": {
+            "description": "Successful Response"
+          },
+          "404": {
+            "description": "OIDC is not the configured provider"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "502": {
+            "description": "IdP unreachable"
+          }
+        },
+        "summary": "Oidc Login",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
     "/api/auth/options": {
       "get": {
         "description": "Unauthenticated: what the login page needs.",

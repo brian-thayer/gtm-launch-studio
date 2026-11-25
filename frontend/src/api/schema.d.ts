@@ -99,6 +99,51 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/auth/oidc/callback": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Oidc Callback
+         * @description Where the identity provider sends the browser back. On success: start the session, audit
+         *     `auth.login` (with the roles the groups mapped to) and redirect to the frontend page asked for. A
+         *     refused person is audited (`auth.login_denied`, with a reason); any failure redirects to
+         *     `/login?error=denied|failed` and signs nobody in.
+         */
+        get: operations["auth_oidc_callback"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/auth/oidc/login": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Oidc Login
+         * @description Start the OIDC sign-in: redirect the browser to the identity provider. Open by nature (it is how
+         *     a session starts), but it changes nothing: ``state`` and the PKCE verifier go in the caller's own
+         *     cookie. ``next`` is checked now and again at the callback.
+         */
+        get: operations["auth_oidc_login"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/auth/options": {
         parameters: {
             query?: never;
@@ -420,6 +465,75 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["Me"];
                 };
+            };
+        };
+    };
+    auth_oidc_callback: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            302: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description OIDC is not the configured provider */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    auth_oidc_login: {
+        parameters: {
+            query?: {
+                /** @description Same-site path to return to; else `/` */
+                next?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            302: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description OIDC is not the configured provider */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description IdP unreachable */
+            502: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };

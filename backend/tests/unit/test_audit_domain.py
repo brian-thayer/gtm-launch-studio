@@ -13,7 +13,14 @@ from gtm_studio.domain.audit import (
 
 
 def test_the_action_names_are_dotted_and_stable() -> None:
-    assert [a.value for a in AuditAction] == ["auth.login", "auth.logout", "auth.login_denied"]
+    assert [a.value for a in AuditAction] == [
+        "auth.login",
+        "auth.logout",
+        "auth.login_denied",
+        "user.provisioned",
+        "user.updated",
+        "user.roles_synced",
+    ]
     assert all("." in a.value and a.value == a.value.lower() for a in AuditAction)
     assert AuditAction.AUTH_LOGIN == "auth.login"  # a plain string wherever one is expected
     assert str(AuditAction.AUTH_LOGIN) == "auth.login"

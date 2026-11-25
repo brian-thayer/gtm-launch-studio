@@ -12,6 +12,7 @@ import pytest
 import structlog
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
+from pydantic import SecretStr
 from sqlalchemy import Engine
 from sqlalchemy.orm import Session
 
@@ -83,6 +84,49 @@ def settings(tmp_path: Path) -> Settings:
         env="test",
         db_url=f"sqlite:///{(tmp_path / 'gtm_studio.db').as_posix()}",
         storage_dir=tmp_path / "storage",
+    )
+
+
+OIDC_ROLE_MAP = """\
+group_to_roles:
+  pmm-group: [pmm]
+  product-group: [product]
+  admins: [admin]
+default_roles: [viewer]
+"""
+
+
+@pytest.fixture
+def hosted_env(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The variables a hosted deployment needs besides GTM_ENV: the OIDC provider, its four values, an
+    https frontend and a real session secret. Tests that build ``Settings()`` for production use it."""
+    for name, value in {
+        "GTM_AUTH_PROVIDER": "oidc",
+        "GTM_SESSION_SECRET": "s" * 48,
+        "GTM_OIDC_ISSUER": "https://idp.example.test",
+        "GTM_OIDC_CLIENT_ID": "gtm-studio",
+        "GTM_OIDC_CLIENT_SECRET": "client-secret-value",
+        "GTM_OIDC_REDIRECT_URL": "https://gtm.example.test/api/auth/oidc/callback",
+        "GTM_FRONTEND_BASE_URL": "https://gtm.example.test",
+    }.items():
+        monkeypatch.setenv(name, value)
+
+
+@pytest.fixture
+def oidc_settings(settings: Settings, tmp_path: Path) -> Settings:
+    """``settings`` with the OIDC provider on and a role map (``OIDC_ROLE_MAP``) written to tmp_path."""
+    role_map = tmp_path / "oidc_roles.yaml"
+    role_map.write_text(OIDC_ROLE_MAP, encoding="utf-8")
+    return Settings(
+        env="test",
+        db_url=settings.db_url,
+        storage_dir=settings.storage_dir,
+        auth_provider="oidc",
+        oidc_issuer="https://idp.example.test",
+        oidc_client_id="gtm-studio",
+        oidc_client_secret=SecretStr("client-secret-value"),
+        oidc_redirect_url="http://localhost:5173/api/auth/oidc/callback",
+        oidc_role_map_path=role_map,
     )
 
 

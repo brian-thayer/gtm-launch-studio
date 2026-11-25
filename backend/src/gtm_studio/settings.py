@@ -30,6 +30,15 @@ def _resolve_path(value: Path) -> Path:
     return value if value.is_absolute() else (REPO_ROOT / value).resolve()
 
 
+def _http_url(value: str) -> str:
+    """An http(s) URL without a trailing '/': the issuer is joined with a path and the frontend URL with
+    the page to return to, so a stray slash would double up."""
+    value = value.strip()
+    if not value.lower().startswith(("http://", "https://")):
+        raise ValueError("must be an http(s) URL")
+    return value.rstrip("/")
+
+
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
         env_prefix="GTM_",
@@ -54,8 +63,22 @@ class Settings(BaseSettings):
     # Signs the session cookie. The default is public (it is in the repository): fine for a local run,
     # refused in production. Generate one with `python -c "import secrets; print(secrets.token_urlsafe(48))"`.
     session_secret: SecretStr = SecretStr(DEV_SESSION_SECRET)
-    # 'dev' lists the seeded users on the login page (no password). 'oidc' arrives in S09.
+    # 'dev' lists the seeded users on the login page (no password). 'oidc' signs in through an identity
+    # provider (Entra ID, Okta, ...) and needs the four oidc_* values marked (required) below.
     auth_provider: Literal["dev", "oidc"] = "dev"
+    oidc_issuer: str | None = None  # (required) e.g. https://login.microsoftonline.com/<tenant>/v2.0
+    oidc_client_id: str | None = None  # (required)
+    oidc_client_secret: SecretStr | None = None  # (required)
+    # (required) Where the IdP sends the browser back: <public origin>/api/auth/oidc/callback. It must be
+    # registered at the IdP exactly as written here.
+    oidc_redirect_url: str | None = None
+    oidc_scopes: str = "openid email profile"
+    oidc_group_claim: str = "groups"  # the ID-token claim holding the person's groups
+    # Which roles each IdP group gives (see config/oidc_roles.example.yaml). Read when the API starts. Unset
+    # means oidc_roles.yaml in config_dir: read it through ``oidc_role_map_file``.
+    oidc_role_map_path: Path | None = None
+    # Where the browser lands after signing in: the frontend's own origin (the Vite dev server locally).
+    frontend_base_url: str = "http://localhost:5173"
 
     @classmethod
     def defaults(cls) -> Self:
@@ -70,6 +93,28 @@ class Settings(BaseSettings):
     @classmethod
     def _absolute_dirs(cls, value: Path) -> Path:
         return _resolve_path(value)
+
+    @field_validator("oidc_role_map_path")
+    @classmethod
+    def _absolute_role_map_path(cls, value: Path | None) -> Path | None:
+        return None if value is None else _resolve_path(value)
+
+    @property
+    def oidc_role_map_file(self) -> Path:
+        """The group -> role map: ``oidc_role_map_path``, else ``oidc_roles.yaml`` in ``config_dir``."""
+        return self.oidc_role_map_path or self.config_dir / "oidc_roles.yaml"
+
+    @field_validator("oidc_issuer", "oidc_redirect_url")
+    @classmethod
+    def _optional_url(cls, value: str | None) -> str | None:
+        """Blank means unset (an empty ``GTM_OIDC_ISSUER=`` line), so the 'required for OIDC' check below
+        reports it by name."""
+        return None if value is None or not value.strip() else _http_url(value)
+
+    @field_validator("frontend_base_url")
+    @classmethod
+    def _required_url(cls, value: str) -> str:
+        return _http_url(value)
 
     @field_validator("db_url")
     @classmethod
@@ -124,4 +169,37 @@ class Settings(BaseSettings):
             raise ValueError("set session_secret (GTM_SESSION_SECRET): the built-in one is public")
         if len(secret) < MIN_SESSION_SECRET_LENGTH:
             raise ValueError(f"session_secret must be at least {MIN_SESSION_SECRET_LENGTH} characters")
+        return self
+
+    @model_validator(mode="after")
+    def _oidc_is_configured(self) -> Self:
+        """Signing in through an identity provider needs four values; say which ones are missing. Declared
+        after the production check on purpose: a hosted deployment is told about its secret first."""
+        if self.auth_provider != "oidc":
+            return self
+        missing = [
+            f"GTM_{name.upper()}"
+            for name, value in (
+                ("oidc_issuer", self.oidc_issuer),
+                ("oidc_client_id", (self.oidc_client_id or "").strip()),
+                (
+                    "oidc_client_secret",
+                    self.oidc_client_secret.get_secret_value().strip() if self.oidc_client_secret else None,
+                ),
+                ("oidc_redirect_url", self.oidc_redirect_url),
+            )
+            if not value
+        ]
+        if missing:
+            raise ValueError(f"auth_provider 'oidc' also needs {', '.join(missing)}")
+        if self.env == "production":
+            # The client secret travels to the token endpoint and the session cookie is Secure: plain http
+            # would leak the first and make the second useless.
+            for name, url in (
+                ("oidc_issuer", self.oidc_issuer),
+                ("oidc_redirect_url", self.oidc_redirect_url),
+                ("frontend_base_url", self.frontend_base_url),
+            ):
+                if url is None or not url.startswith("https://"):
+                    raise ValueError(f"{name} must be an https URL when env is 'production'")
         return self

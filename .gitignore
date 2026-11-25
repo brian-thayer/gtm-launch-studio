@@ -3,6 +3,8 @@
 .env.*
 !.env.example
 .claude/settings.local.json
+# Deployment-specific IdP group IDs (config/oidc_roles.example.yaml is the committed template).
+config/oidc_roles.yaml
 
 # Python
 __pycache__/

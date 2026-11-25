@@ -23,7 +23,7 @@ Status values: `todo` · `in progress` · `done` · `blocked`. **Human** marks s
 | S06 | Users, roles, permissions, dev login, sessions | done | S05 | |
 | S07 | Audit log, request IDs, structured logging, activity API | done | S06 | |
 | S08 | Frontend login, app shell, protected routes, Activity page | done | S04, S07 | |
-| S09 | OIDC provider skeleton, hosting notes, security review | todo | S07 | |
+| S09 | OIDC provider skeleton, hosting notes, security review | done | S07 | |
 | — | **/review-milestone M1** (Opus) | todo | S02–S09 | |
 
 ## M2: GTM catalog from the user's material (step cards written in full)
