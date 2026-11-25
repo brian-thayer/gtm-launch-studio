@@ -3,7 +3,7 @@
 Status: todo
 Milestone: M2
 Depends on: S13
-Human in the loop: **yes**. The user provides past assets in `gtm_catalog/sources/examples/<asset_type>/`, confirms the redactions, and decides whether each example may be committed.
+Human in the loop: **yes**. The user provides past assets under `gtm_catalog/sources/` (ideally `examples/<asset_type>/`, but anywhere is fine; the skill asks which asset type an unclear file belongs to), confirms the redactions, and decides whether each example may be committed.
 Size budget: data only
 
 ## Goal
@@ -17,7 +17,7 @@ Examples carry tone, depth and structure better than any instruction. They also 
 - Each MVP asset type's `spec.yaml`, `prompt.md` and `rubric.md`
 
 ## Procedure
-1. Inventory `sources/examples/`. Map each file to an asset type, and ask the user about any that are ambiguous.
+1. Inventory the example material under `sources/`. Map each file to an asset type, and ask the user about any that are ambiguous.
 2. Run `/add-gold-example <key> <file>` for each one. Skip any that score below 4 on a rubric criterion, and report them. The rubric might need changing, so propose the edit to the user rather than silently weakening it.
 3. Show the user the redaction diff (original term → placeholder) for every example. Get explicit confirmation before saving the file.
 4. Ask whether the redacted examples may be committed. If not, add `gtm_catalog/asset_types/*/examples/` to `.gitignore` and record that the examples are local only. Evals then need the local files.

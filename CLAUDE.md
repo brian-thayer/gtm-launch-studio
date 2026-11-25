@@ -19,10 +19,10 @@ Commands exist once the step that adds them is done (see ROADMAP). Run backend c
 - Lint, types and layers: `uv run ruff check .`, `uv run pyright`, `uv run lint-imports`
 - API dev server: `uv run uvicorn gtm_studio.api.app:create_app --factory --reload --port 8000`
 - Worker: `uv run gtm worker`
-- Catalog check: `uv run gtm catalog validate`
+- Catalog: `uv run gtm catalog validate [--path P] [--strict]` · `uv run gtm catalog show [--path P]` (S10/S10b; `--path` is relative to the working directory, `GTM_CATALOG_DIR` to the repo root)
 - DB migrate: `uv run gtm db upgrade` · `uv run gtm db current` · `uv run gtm db revision -m "msg" --autogenerate` (then review the file it writes)
 - Demo users: `uv run gtm seed dev-users` (idempotent; reads `config/dev_users.yaml`; refuses in production)
-- Frontend: `npm run dev` · `npm run test` · `npm run lint` · `npm run typecheck` · `npm run e2e` (e2e starts its own API on 8000 and Vite on 5173, or reuses ones already running)
+- Frontend: `npm run dev` · `npm run test` · `npm run lint` · `npm run typecheck` · `npm run format:check` · `npm run e2e` (e2e starts its own API on 8000 and Vite on 5173, or reuses ones already running)
 - Regenerate the API client after changing an endpoint: `uv run gtm openapi > ../frontend/openapi.json`, then `npm run gen:api`. Commit `frontend/openapi.json` and `frontend/src/api/schema.d.ts` with the endpoint change: `backend/tests/api/test_openapi_contract.py` fails when they drift.
 - Everything at once (Windows): `powershell -File scripts/dev.ps1` migrates the database, seeds the demo users (so the login page has someone to sign in as), opens the `gtm-api`, `gtm-worker` and `gtm-web` windows and waits until http://localhost:5173 can reach the API. `powershell -File scripts/dev.ps1 -Stop` stops them. It finds `uv` itself, even when `uv` isn't on PATH.
 
@@ -35,7 +35,7 @@ Commands exist once the step that adds them is done (see ROADMAP). Run backend c
 6. **Layering.** `domain` (pure, no IO) ← `services` ← `api` / `worker`. `adapters` implement ports. `import-linter` enforces this. Business rules never live in the frontend or in routers.
 7. **No GTM taxonomy in code.** Gates, tiers, asset types, brand terms, thresholds, prices and model routes come from `gtm_catalog/` or `config/`. No company or product names in code.
 8. **No Bedrock calls without the user's explicit approval in this session.** They cost money. Tests use `MockLLM`. Bedrock tests need `-m bedrock` and `GTM_ALLOW_BEDROCK=1`, and a hook will ask first.
-9. **Never read or print `.env` files or secrets.** Use `.env.example` for the variable names.
+9. **Never read or print `.env` files or secrets.** The variable names and defaults are in the README's backend configuration table. The user's permission rules block every `.env*` file, `.env.example` included, so don't try to create or read one.
 
 ## How we work
 - One **step card** (`docs/plan/steps/S##-*.md`) per session. Use `/implement-step S##`. Stay inside the card's scope. If the card is wrong or blocked, stop and say so rather than improvising a redesign.
@@ -57,6 +57,8 @@ Commands exist once the step that adds them is done (see ROADMAP). Run backend c
 - Every Bash call prints about 12 lines of harmless `/etc/mtab ... Permission denied` noise. Ignore it.
 - Python 3.12 and Node 24 are installed. `uv` was installed in S02 with `py -m pip install --user uv`. Its folder is not on Git Bash's PATH by default. If you see `uv: command not found`, run `export PATH="$PATH:$(cygpath "$APPDATA")/Python/Python312/Scripts"` first. Until that folder is on the Windows user PATH, the format and stop-test hooks skip quietly (they look up `uv` with `shutil.which`).
 - Headless Microsoft Edge is the browser for PDF rendering and Playwright (`channel: "msedge"`). Don't download Chromium.
+- The Read tool can't render PDFs here (no poppler). Use `pdftotext -layout "<file>" -` (Git for Windows ships it), with `-f`/`-l` for page ranges.
+- `core.autocrlf` is on, so files check out with CRLF. Prettier uses `endOfLine: auto`, and the API contract files are pinned to LF in `.gitattributes`.
 - SAPI (Windows voices) is the only TTS. Video jobs run only on a Windows worker.
 - `rm -rf` is blocked by a hook. Use a fresh temp directory instead of deleting.
 - Python edits that contain non-ASCII (emoji, `›`, `—`) get mangled through Bash heredocs. Use the Edit tool for those.

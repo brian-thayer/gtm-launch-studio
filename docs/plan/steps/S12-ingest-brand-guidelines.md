@@ -2,8 +2,8 @@
 
 Status: todo
 Milestone: M2
-Depends on: S10 (can run in parallel with S11)
-Human in the loop: **yes**. The user provides the brand guide in `gtm_catalog/sources/brand/`, reviews `terminology.yaml` and `legal.md` line by line, and confirms whether logo files may be committed.
+Depends on: S10b (can run before or in parallel with S11)
+Human in the loop: **yes**. The user provides the brand material anywhere under `gtm_catalog/sources/`. **Already present:** a 2026 brand guide PDF, a UX content style guide PDF, and an icon folder (about 450 PNG/SVG files). The user reviews `terminology.yaml` and `legal.md` line by line, and confirms whether logo files may be committed.
 Size budget: data only
 
 ## Goal
@@ -17,10 +17,10 @@ Size budget: data only
 - `backend/src/gtm_studio/domain/catalog.py` (`Brand`, `Terminology`, `Visual`)
 
 ## Procedure
-1. Confirm the sources exist; if not, stop and ask the user.
+1. Inventory the brand material under `gtm_catalog/sources/` (recursively). The PDFs are large: extract text with `pdftotext -layout <file> -` and read it in sections (see `catalog-author`). Confirm with the user which document wins when the brand guide and the UX content style guide disagree.
 2. Run `/ingest-brand-guidelines`.
 3. Size check: `voice.md`, `claims.md` and `legal.md` together should be about 2,500 words or less, since they're sent with every request and must stay sharp. If the guide is longer, summarize into rules and keep 1–2 short examples per rule. Tell the user what was condensed.
-4. Logos: copy them into `gtm_catalog/brand/assets/` only if the user confirms they can be committed. Otherwise reference a path under `sources/` and note that rendering falls back to a text logo.
+4. Icons are out of scope for the catalog: leave the icon folder in `sources/` and note its path in `visual.yaml` comments for S39. Logos: copy them into `gtm_catalog/brand/assets/` only if the user confirms they can be committed. Otherwise reference a path under `sources/` and note that rendering falls back to a text logo.
 5. Run `uv run gtm catalog validate`.
 6. Do a line-by-line review of `terminology.yaml` and `legal.md` with the user, since these become hard checks. Resolve every TODO.
 

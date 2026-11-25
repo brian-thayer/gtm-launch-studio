@@ -24,18 +24,23 @@ Status values: `todo` · `in progress` · `done` · `blocked`. **Human** marks s
 | S07 | Audit log, request IDs, structured logging, activity API | done | S06 | |
 | S08 | Frontend login, app shell, protected routes, Activity page | done | S04, S07 | |
 | S09 | OIDC provider skeleton, hosting notes, security review | done | S07 | |
-| — | **/review-milestone M1** (Opus) | todo | S02–S09 | |
+| — | **/review-milestone M1** (Opus) | done (2026-11-25) | S02–S09 | |
 
-## M2: GTM catalog from the user's material (step cards written in full)
+## M2: GTM catalog from the user's material (step cards rewritten at the M1 review, 2026-11-25)
+Order: run the code steps first (S10a → S10 → S10b → S15 → S15b), because they need nothing from the user and the demo catalog stands in. Run the human-gated ingest steps as the material and the user's time allow: S12 can start right after S10b (the brand material is already in `sources/`), and S11 needs the lifecycle answers. See ADR-0005 for the catalog schema and ADR-0006 for the backend conventions.
+
 | Step | Title | Status | Depends on | Human |
 |---|---|---|---|---|
-| S10 | Catalog models, loader, validator, version hash, demo catalog fixture | todo | S02 | |
-| S11 | Ingest tier framework and lifecycle (`/ingest-tier-framework`) | todo | S10 | **tier and lifecycle docs, answers** |
-| S12 | Ingest brand guidelines (`/ingest-brand-guidelines`) | todo | S10 | **brand guide, review** |
-| S13 | Define asset types (`/add-asset-type`) | todo | S11 | **asset list, review** |
+| S10a | Backend conventions from the M1 review (errors, uow dependency, clock, role key, audited seeding, audit index, template test DB) | todo | S09 | |
+| S10 | Catalog models (core / optional / triggers / timing), loader, version hash, `gtm catalog show`, `catalog_min` | todo | S10a | |
+| S10b | Catalog validator, `gtm catalog validate`, demo catalog | todo | S10 | |
+| S15 | Catalog in the app: service, role sync, read API, admin reload, "no catalog" state | todo | S10b | |
+| S15b | Catalog page; login follow-ups (SSO `next`, error messages, server-error page, `safeNext` parity) | todo | S15 | approve `npm install react-markdown` |
+| S11 | Ingest tier framework and lifecycle (`/ingest-tier-framework`) | todo | S10b | **lifecycle gates and approvers, answers, sign-off** |
+| S12 | Ingest brand guidelines (`/ingest-brand-guidelines`) | todo | S10b | **review terminology and legal, logo decision** |
+| S13 | Define asset types (`/add-asset-type`) | todo | S11 | **MVP set, review** |
 | S14 | Gold examples (`/add-gold-example`) | todo | S13 | **examples, redaction sign-off** |
-| S15 | Catalog API, role sync, read-only Catalog UI, admin reload | todo | S08, S10 | |
-| — | **/review-milestone M2** (Opus) | todo | S10–S15 | |
+| — | **/review-milestone M2** (Opus) | todo | S10a–S15b | |
 
 ## M3: Progressive product context (outline; cards written at the M2 review)
 | Step | Title | Ports from old POC |
@@ -48,10 +53,10 @@ Status values: `todo` · `in progress` · `done` · `blocked`. **Human** marks s
 | S21 | Document upload, BlobStore, text extraction, heading chunks | `ingest/docs.py` |
 | S22 | LLM fact extraction → proposed facts → user confirms (untrusted-input guard) | — |
 | S23 | Notes and corrections, precedence, provenance | — |
-| S24 | Context gaps (`required_context` × tier × gate) and follow-up questions | — |
+| S24 | Context gaps (`required_context` × tier × gate, plus each trigger's boolean fact) and follow-up questions | — |
 | S25 | Aha! API port + local mock API + webhook stub | `ingest/aha_api.py` (design notes) |
 | S26 | Knowledge base (FTS5) behind `KnowledgeSource` | `context/local_kb.py`, `knowledge/` |
-| S27 | Portfolio and Solution workspace UI | `app/Home.py`, `app/pages/3_Asset_Matrix.py` (ideas only) |
+| S27 | Portfolio and Solution workspace UI, including trigger switches and optional-asset opt-ins (audited user actions, ADR-0005) | `app/Home.py`, `app/pages/3_Asset_Matrix.py` (ideas only) |
 
 ## M4: LLM layer on Bedrock (outline)
 | Step | Title | Ports |
@@ -64,8 +69,8 @@ Status values: `todo` · `in progress` · `done` · `blocked`. **Human** marks s
 ## M5: Generation engine and review (outline)
 | Step | Title | Ports |
 |---|---|---|
-| S32 | Planner: catch-up, foundation gating, tier after approval, DAG, BLOCKED | `workflow/orchestrator.py`, `tests/test_workflow.py` |
-| S33 | Job queue and worker, SSE progress (ADR-0004) | — |
+| S32 | Planner: core (inherited) ∪ applied triggers ∪ opted-in optional (ADR-0005); catch-up, foundation gating, tier after approval, DAG, BLOCKED; timing as due dates only | `workflow/orchestrator.py`, `tests/test_workflow.py` |
+| S33 | Job queue and worker, SSE progress (ADR-0004); SQLite `BEGIN IMMEDIATE` writes and `IntegrityError` → `ConflictError`; the worker reloads the catalog when `version_hash` changed | — |
 | S34 | Writer, schema families, manifests | `agents/writer.py`, `agents/schemas.py` |
 | S35 | Judges: deterministic + rubric LLM panel + auto-revision | `agents/judges.py`, `config/prompts/judge.md.j2` |
 | S36 | Review state machine, RBAC approvals, edit capture | `workflow/gates.py` |
@@ -90,6 +95,13 @@ Status values: `todo` · `in progress` · `done` · `blocked`. **Human** marks s
 | S47 | `docs/security.md`, `docs/hosting.md` hardening checklist, final security review |
 
 ## Backlog (unscheduled)
+- **Catalog reload across processes** for hosting with several API processes: store the active `version_hash` in the database and have each process reload when it differs (S15 reloads only the process that served the request; S33 covers the worker).
+- Activity page: the actor filter becomes a select once an endpoint lists users (S08 follow-up).
+- Type-aware ESLint once there is more feature code (S03 follow-up).
+- Run the OIDC flow against a real IdP (Entra ID or Okta) before hosting (S09 follow-up; the flow is only tested against `FakeIdp`).
+- Editing the catalog in the UI (files plus review stay the source of truth until then).
+- Define the non-MVP asset types that S13 leaves out (S13 adds one line per key here).
+- **User action:** put `%APPDATA%\Python\Python312\Scripts` on the Windows user PATH so the format and stop-test hooks run (S02 follow-up; they skip quietly until then).
 - Live Aha! API connector (replaces the mock behind `AhaSource`; needs an API key and a service user).
 - Postgres in docker-compose for local parity testing.
 - A non-SAPI TTS provider for Linux hosting (needs the user's decision; currently out of scope).

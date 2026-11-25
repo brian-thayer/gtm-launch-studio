@@ -156,3 +156,42 @@ Newest entries go at the bottom. Each step appends one entry: what was built, an
 - Review: `code-reviewer` first pass **BLOCKED** on two items, both fixed: the security review wasn't recorded (this entry and the card Notes), and `authlib` was missing from `QUIET_LIBRARIES` (it logs the PKCE verifier at DEBUG; test added). Non-blocking items taken: the role-map path follows `GTM_CONFIG_DIR`, an inactive user is always refused as `inactive`, a confusing sentence in `docs/hosting.md`, and `config/oidc_roles.yaml` git-ignored. Second pass: **PASS WITH NITS**, nothing blocking. Fixed: `joserfc` is now forbidden outside `auth/` by import-linter, and a whitespace-only client ID or secret counts as missing. Recorded: the wider concurrent-sign-in race (S33) and that denials with no user record store the IdP subject as `entity_id` (ADR addendum).
 - Follow-ups: the frontend's SSO link should pass `next` and the login page should show `?error=denied|failed` (S08 files); S15's catalog role sync must activate roles that OIDC created inactive (note added to that card); two simultaneous first sign-ins for one `sub` can 500 (S33); rate limits, TLS and the Postgres `REVOKE` need applying and testing in the hosted deployment (S47); the flow hasn't been run against a real IdP.
 - Verification (from `backend/`): `uv run pytest` 337 passed · `ruff check` clean · `ruff format --check` 77 files formatted · `pyright` 0 errors · `lint-imports` 3 contracts kept · `gtm openapi` matches the committed `frontend/openapi.json`. Frontend (regenerated client only): `npm run typecheck` clean · `npm run lint` clean · `npm run test` 60 passed. A real `uvicorn` in OIDC mode on a throwaway database: `/api/auth/options` answered `oidc`, `/oidc/login` answered 502 for an unreachable IdP, a callback with no flow started redirected to `/login?error=failed`, and dev login answered 404.
+
+## M1 milestone review (2026-11-25, Opus)
+- **Verdict: M1 done.**
+  - S02–S09 are all `done`, and the full suite passes from a clean state.
+  - `code-reviewer` (whole-milestone diff `0ad572a..cdff2d4`): **PASS WITH NITS**, nothing blocking. No invariant breaches: every state change is authenticated, permission-checked and audited in its own unit of work; `can_approve` keeps separation of duties; no taxonomy in code; no Bedrock in tests.
+- Live walk-through (uvicorn on a throwaway database, curl, two cookie jars):
+  - anonymous requests get 401, and a POST without the CSRF header gets 403;
+  - the viewer and an approver (`pmm`) get 403 on `GET /api/activity`, and the admin gets 200;
+  - logout ends the session;
+  - Activity attributes each `auth.login` to Avery Admin, Val Viewer and Priya Marketing, and an unknown-ID attempt to `system`;
+  - direct `UPDATE` and `DELETE` on `audit_events` are rejected by the triggers.
+  - The browser side of the same flow is covered by `e2e/auth.spec.ts` (7 passed).
+- Fixed during the review:
+  - Prettier flagged 47 files. All of it was CRLF from `core.autocrlf=true`; `frontend/.prettierrc` now sets `endOfLine: auto`, and `npm run format:check` was added.
+  - import-linter now forbids `sqlalchemy` and `alembic` in `services`, and `alembic` and `yaml` in `domain` (all contracts still kept).
+- Decisions:
+  - **ADR-0005, the catalog requirement model.** The user's first real source (the release-collateral proposal in `sources/`) has core, when-needed (triggered) and optional collateral, cumulative tiers, and GA-relative timing that is "planning context, not an approval gate". The S10 shape (`required_assets` by gate) couldn't express it.
+  - **ADR-0006, backend conventions after M1:**
+    - reads go through services, with one exception handler and one `get_uow_factory`;
+    - a pure clock and role-key check, and file loaders out of `services/`;
+    - anonymous dev-login failures are logged rather than audited, and seeding is audited;
+    - a composite audit index and template test databases.
+- Plan changes:
+  - M2 is re-cut into S10a (conventions) → S10 (models, loader) → S10b (validator, demo) → S15 (backend) → S15b (UI), all free of user input.
+  - The human-gated S11–S14 follow when the user is ready. S12's brand material is already present. S11 still needs the lifecycle gates and approvers, which no source names.
+  - S15 now also covers a "no catalog" state (so the code steps don't wait for S11), hermetic test settings (`catalog_min`), the e2e backend and `dev.ps1` on the demo catalog, a `put_role` port method, and `Me.role_info`.
+  - S11–S14 were updated for the new schema, sources at the top level of `sources/`, and PDF reading.
+  - M3–M5 outline rows note triggers and opt-ins (S24, S27, S32), plus `BEGIN IMMEDIATE` and the worker's catalog reload (S33).
+  - The Backlog gained the cross-process catalog reload, a real-IdP test, the actor-filter select and type-aware ESLint.
+- Harness:
+  - root `CLAUDE.md`: invariant 9 now points at the README (`.env*` is blocked by user-level rules), plus the catalog commands, `format:check`, `pdftotext` and the CRLF note;
+  - `backend/CLAUDE.md`: reads through services, loaders in infrastructure, the error-handling pointer, the stricter contracts;
+  - the `catalog-author` agent reads PDFs with `pdftotext` (the Read tool has no poppler here) and inventories `sources/` recursively;
+  - the three catalog skills and `gtm_catalog/CLAUDE.md` follow ADR-0005;
+  - `step-implementer` stops at about 1.5× the size budget instead of overrunning.
+- Not done: the proposed `.claude/settings.json` allow rules were refused by the permission classifier, so they're left to the user (see the review report).
+- Verification (clean state, `review/M1` branch):
+  - backend: `uv run pytest -q` 337 passed in 30 s · `ruff check` clean · `ruff format --check` 77 files formatted · `pyright` 0 errors · `lint-imports` 3 contracts kept (before and after tightening);
+  - frontend: `npm run lint` clean · `npm run typecheck` clean · `npm run test` 60 passed (11 files) · `npm run e2e` 7 passed · `npm run format:check` clean after the fix.

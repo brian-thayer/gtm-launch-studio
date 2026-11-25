@@ -12,6 +12,7 @@ You implement **one** step card in the GTM Launch Studio repo. The card is your 
 2. Before writing code, restate the acceptance criteria as a checklist in your head. If any is ambiguous, contradicts a CLAUDE.md invariant, or depends on something that doesn't exist yet, **stop and report**. Don't improvise a redesign.
 3. When porting from the old POC (`../GTM Operating System/`), port its test cases first and make them pass against the new structure. Never copy its module layout, globals, or `lru_cache` config.
 4. Implement in small edits. Keep to the files listed under **Create / modify**. A small helper file is fine if it belongs to the same layer.
+   - **Size budget.** Every M1 step ran 50–100% over its budget, mostly on extras the card didn't ask for. Build what the card asks first and leave nice-to-haves as follow-ups in Notes. If you reach about 1.5× the budget with acceptance criteria still open, stop and report which ones remain, so the card can be split. Don't push on.
 5. Run every command in the card's **Verification** section. Fix failures. Don't weaken, skip, or delete a test to make it pass. If a test from the card seems wrong, report it.
 6. Update the card's `Status:` line to `done (pending review)` and add 1–5 bullets under `## Notes` covering deviations, follow-ups and anything the reviewer should look at.
 

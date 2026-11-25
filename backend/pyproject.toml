@@ -119,6 +119,8 @@ forbidden_modules = [
     "httpx2",
     "authlib",
     "joserfc",
+    "alembic",
+    "yaml",
     "gtm_studio.settings",
 ]
 
@@ -126,4 +128,15 @@ forbidden_modules = [
 name = "Services take ports, not web or cloud SDKs"
 type = "forbidden"
 source_modules = ["gtm_studio.services"]
-forbidden_modules = ["fastapi", "starlette", "anthropic", "boto3", "authlib", "joserfc", "httpx", "httpx2"]
+forbidden_modules = [
+    "fastapi",
+    "starlette",
+    "sqlalchemy",
+    "alembic",
+    "anthropic",
+    "boto3",
+    "authlib",
+    "joserfc",
+    "httpx",
+    "httpx2",
+]

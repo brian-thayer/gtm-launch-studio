@@ -7,10 +7,10 @@ disable-model-invocation: true
 
 # Add asset type: $ARGUMENTS
 
-Follow `catalog-author` rules. Read `gtm_catalog/CLAUDE.md`, `gtm_catalog/tiers.yaml`, `gtm_catalog/lifecycle.yaml`, `gtm_catalog/context_keys.yaml` and `backend/src/gtm_studio/catalog/models.py` first.
+Follow `catalog-author` rules. Read `gtm_catalog/CLAUDE.md`, `gtm_catalog/tiers.yaml`, `gtm_catalog/lifecycle.yaml`, `gtm_catalog/context_keys.yaml` and `backend/src/gtm_studio/domain/catalog.py` first, and `docs/adr/0005-catalog-requirement-model.md`.
 
 ## Steps
-1. Find the asset in `gtm_catalog/sources/asset_types/` (or the given file) and in `tiers.yaml` `required_assets`. Work out its gate and which tiers require it from there. Don't invent either.
+1. Find the asset in the material under `gtm_catalog/sources/` (or the given file) and in `tiers.yaml` (`core`, `optional` or a trigger's `assets`). The tiers and triggers that need it come from `tiers.yaml`; its **gate** goes in `spec.yaml` (S11's Notes record the gate the user named). Don't invent either.
 2. Decide the schema **family** from the families registered in the backend (e.g. `generic_doc`, `battlecard`, `email_set`, `deck`, `launch_video`, `classification`). If none fits, stop and propose a new family to the user, since it needs code and a step card.
 3. **Write `spec.yaml`:**
    - `key`, `name`, `gate`, `audience` (`internal` or `external`), `family`;

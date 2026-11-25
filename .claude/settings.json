@@ -23,7 +23,13 @@
       "Bash(git branch:*)",
       "Bash(git switch:*)",
       "Bash(git checkout -b:*)",
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "Bash(uv run gtm catalog show:*)",
+      "Bash(uv run gtm db current:*)",
+      "Bash(uv run gtm version:*)",
+      "Bash(uv run gtm seed dev-users:*)",
+      "Bash(npm run format:*)",
+      "Bash(pdftotext:*)"
     ],
     "ask": [
       "Bash(git push:*)",

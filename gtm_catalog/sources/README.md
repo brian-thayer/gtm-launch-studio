@@ -2,6 +2,8 @@
 
 Put your raw documents here, in any format (PDF, DOCX, PPTX, XLSX, MD). Everything in this folder except this README is **git-ignored**.
 
+Subfolders are optional: files at the top level are fine, because the skills inventory the whole folder.
+
 | Subfolder | What to put here | Used by |
 |---|---|---|
 | `brand/` | Brand guidelines: voice and tone, visual identity, logo files, naming rules, legal and claims guidance | `/ingest-brand-guidelines` (S12) |

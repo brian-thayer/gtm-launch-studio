@@ -12,6 +12,7 @@
     "lint": "eslint .",
     "typecheck": "tsc -b --noEmit",
     "format": "prettier --write .",
+    "format:check": "prettier --check .",
     "e2e": "playwright test",
     "gen:api": "openapi-typescript ./openapi.json -o src/api/schema.d.ts"
   },

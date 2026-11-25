@@ -1,16 +1,16 @@
 ---
 name: ingest-brand-guidelines
-description: Turn the user's brand guidelines (gtm_catalog/sources/brand) into gtm_catalog/brand/ files — voice, terminology, claims, legal, visual identity — faithfully, with TODOs for gaps. Use for step S12 or when brand guidelines change.
+description: Turn the user's brand guidelines (anywhere under gtm_catalog/sources/) into gtm_catalog/brand/ files — voice, terminology, claims, legal, visual identity — faithfully, with TODOs for gaps. Use for step S12 or when brand guidelines change.
 argument-hint: "[optional path to a specific source file]"
 disable-model-invocation: true
 ---
 
 # Ingest brand guidelines
 
-Delegate the authoring to the `catalog-author` subagent, or follow its rules inline. Read `gtm_catalog/CLAUDE.md` and `backend/src/gtm_studio/catalog/models.py` first.
+Delegate the authoring to the `catalog-author` subagent, or follow its rules inline. Read `gtm_catalog/CLAUDE.md` and `backend/src/gtm_studio/domain/catalog.py` (`Brand`, `Terminology`, `Visual`) first.
 
 ## Steps
-1. **Inventory** `gtm_catalog/sources/brand/` (or $ARGUMENTS). Summarize the sections you found: voice, tone by audience, naming, terminology, claims, legal, visual (colours, type, logo), templates.
+1. **Inventory** the brand material under `gtm_catalog/sources/`, recursively (or $ARGUMENTS). Summarize the sections you found: voice, tone by audience, naming, terminology, claims, legal, visual (colours, type, logo), templates.
 2. **Write each file.** Keep them concise and actionable. These files go into every prompt (`voice.md`, `claims.md`, `legal.md`) or drive deterministic checks (`terminology.yaml`), so precision beats length.
 
    | File | Content |
