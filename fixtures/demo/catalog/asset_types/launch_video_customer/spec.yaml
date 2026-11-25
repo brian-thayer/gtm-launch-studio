@@ -1,0 +1,8 @@
+# DEMO ONLY: synthetic, not a real company's GTM framework
+key: launch_video_customer
+name: "Launch Video: customer"
+gate: monthly_release
+audience: external
+family: launch_video
+formats: [html, md, json, pptx, mp4, srt]
+effort: high

@@ -1,0 +1,7 @@
+# DEMO ONLY: synthetic, not a real company's GTM framework
+key: release_digest
+name: "Release Digest"
+gate: monthly_release
+audience: internal
+family: generic_doc
+formats: [html, md, json, docx]

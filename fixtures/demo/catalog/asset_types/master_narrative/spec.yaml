@@ -1,0 +1,9 @@
+# DEMO ONLY: synthetic, not a real company's GTM framework
+key: master_narrative
+name: "Master Narrative"
+gate: ga_candidate
+audience: internal
+family: generic_doc
+depends_on: [solution_messaging]
+formats: [html, md, json, docx]
+effort: high

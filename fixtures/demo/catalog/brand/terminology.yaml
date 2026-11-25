@@ -1,0 +1,21 @@
+# DEMO ONLY: synthetic, not a real company's GTM framework
+# Product naming and terminology (demo placeholder, from the first POC's terminology.yaml).
+# The brand judge flags any "avoid" term found in a draft and suggests the "use" term.
+product_names:
+  - { name: Vonage, rules: The company name. }
+preferred:
+  - { use: contact centre, avoid: [call center, call centre] }
+  - { use: AI virtual agent, avoid: [chatbot] }
+  - { use: cost-effective, avoid: [cheap] }
+  - { use: (state the specific proof instead), avoid: [world-class, best-in-class] }
+  - { use: (state the specific outcome instead), avoid: [revolutionary, game-changing] }
+  - { use: (describe what actually happens), avoid: [seamless] }
+# Phrases that must never appear in EXTERNAL assets (compliance judge).
+banned_external:
+  - guarantee
+  - guaranteed
+  - coming soon
+  - roadmap
+  - will be available
+  - in the next release
+  - internal only

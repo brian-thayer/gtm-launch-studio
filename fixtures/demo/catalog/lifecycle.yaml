@@ -1,0 +1,87 @@
+# DEMO ONLY: synthetic, not a real company's GTM framework
+# Converted from the first POC's config/lifecycle.yaml: the same 8 gates in the same order, with the same
+# colours and release gate.
+#
+# The old free-text `approver` became role keys. A gate lists the roles that may approve it: a holder of
+# any one of them can (the old "Product + PMM + CS" meant all three signing off; that is not modelled yet).
+#   PMM                      -> pmm
+#   Product                  -> product
+#   Product + PMM + CS       -> product, pmm, cs
+#   Product + CS             -> product, cs
+#   PMM, Product, Support    -> pmm, product, support
+#   Launch & channel owners  -> launch_owner
+#   PMM final review         -> pmm
+
+roles:
+  - { key: pmm, label: Product marketing }
+  - { key: product, label: Product management }
+  - { key: cs, label: Customer success }
+  - { key: support, label: Support }
+  - { key: launch_owner, label: Launch and channel owner }
+
+gates:
+  - key: opportunity_approved
+    label: "AHA Opportunity approved"
+    short: Opportunity
+    order: 1
+    approver_roles: [pmm]
+    color: "#6E5BFF"
+  - key: solution_defined
+    label: "AHA Solution created / updated"
+    short: Solution
+    order: 2
+    approver_roles: [product]
+    color: "#7B2FF7"
+  - key: beta_approved
+    label: "Beta approved"
+    short: Beta
+    order: 3
+    approver_roles: [product, pmm, cs]
+    color: "#D6409F"
+  - key: pilot_approved
+    label: "Pilot approved"
+    short: Pilot
+    order: 4
+    approver_roles: [product, cs]
+    color: "#E5533D"
+  - key: ga_candidate
+    label: "GA candidate ready"
+    short: GA candidate
+    order: 5
+    approver_roles: [pmm, product, support]
+    color: "#1F9D55"
+  - key: ga_readiness
+    label: "GA readiness confirmed"
+    short: GA readiness
+    order: 6
+    approver_roles: [launch_owner]
+    color: "#1E7FD8"
+  - key: monthly_release
+    label: "Monthly release cutoff"
+    short: Release
+    order: 7
+    approver_roles: [pmm]
+    color: "#0F9E99"
+    release_gate: true # triggered by a release reaching cutoff, not by a solution stage
+  - key: post_launch
+    label: "Post-launch signal"
+    short: Post-launch
+    order: 8
+    approver_roles: [product, cs]
+    color: "#C99700"
+
+# The value of the gate-approval column that counts as an approved lifecycle decision.
+approved_gate_values: ["Approved"]
+
+# Release statuses that trigger the monthly release gate.
+release_cutoff_values: ["cutoff", "cutoff approved", "released", "shipped"]
+
+# Go / No-Go readiness categories (dashboard).
+readiness_categories:
+  - { key: product_defined, label: Product defined, gates: [opportunity_approved, solution_defined] }
+  - { key: product_ready, label: Product ready, gates: [beta_approved, pilot_approved] }
+  - { key: positioning, label: Positioning and messaging, gates: [ga_candidate] }
+  - { key: sales_enabled, label: Sales enabled, gates: [ga_candidate, ga_readiness] }
+  - { key: cs_enabled, label: CS enabled, gates: [ga_candidate] }
+  - { key: support_enabled, label: Support enabled, gates: [beta_approved] }
+  - { key: comms_ready, label: Comms ready, gates: [ga_readiness] }

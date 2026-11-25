@@ -1,0 +1,8 @@
+# DEMO ONLY: synthetic, not a real company's GTM framework
+key: launch_video_internal
+name: "Launch Video: internal enablement"
+gate: monthly_release
+audience: internal
+family: launch_video
+formats: [html, md, json, pptx, mp4, srt]
+effort: high

@@ -11,6 +11,6 @@ These files were copied from the first POC (`../GTM Operating System/`). They ar
 | `aha/make_samples.reference.py` | The old generator script, kept for reference when samples need regenerating | — |
 | `prds/ai-proactive-outreach.md` | A sample PRD for document upload and fact extraction | S21, S22 |
 | `knowledge/` | Fictional competitor profiles, personas and customer-voice notes for the knowledge base | S26 |
-| `catalog/` | The demo GTM catalog, converted from the old POC config | S10 |
+| `catalog/` | The demo GTM catalog: 8 gates, 3 tiers and 11 asset types, converted from the old POC config. Every file starts with a `DEMO ONLY` marker. Validate it with `uv run gtm catalog validate --path ../fixtures/demo/catalog` (11 "no gold examples" warnings are expected). The old company name appears only in `catalog/brand/` | S10b, S15, S15b, e2e |
 
 When the user supplies real Aha! exports, add them as private local files. Never put them here.

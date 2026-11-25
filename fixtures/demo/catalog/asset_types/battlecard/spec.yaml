@@ -1,0 +1,10 @@
+# DEMO ONLY: synthetic, not a real company's GTM framework
+key: battlecard
+name: "Competitive Battlecard"
+gate: ga_candidate
+audience: internal
+family: battlecard
+depends_on: [master_narrative]
+formats: [html, md, json, docx]
+required_context: [aha.competitors]
+effort: high

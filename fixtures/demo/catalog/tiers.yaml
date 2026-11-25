@@ -1,0 +1,65 @@
+# DEMO ONLY: synthetic, not a real company's GTM framework
+# Converted from the first POC's config/asset_catalog.yaml: an asset the old catalog gave `tiers: [1, 2, 3]`
+# is core for tier_3 (and, because tiers inherit from the ones below, for every tier); `[1, 2]` is core for
+# tier_2. None of the 11 demo assets was tier-1-only or had a gap in its list, so tier_1 adds nothing of
+# its own and no asset is optional.
+
+inherits_lower: true
+
+tiers:
+  - key: tier_1
+    label: Tier 1
+    rank: 1
+    description: A major, multi-channel launch.
+    examples: [A flagship capability announced to every segment]
+    criteria:
+      - { key: revenue_impact, label: Revenue impact, description: Large expected revenue impact. }
+      - { key: strategic_fit, label: Strategic fit, description: Central to the company strategy. }
+      - { key: market_visibility, label: Market visibility, description: Highly visible to the market. }
+      - { key: enablement_need, label: Enablement need, description: Every field team needs enablement. }
+    channels: [email, web, press, social]
+    core: [] # inherits tier_2 and tier_3
+    timing:
+      anchor: aha.target_ga_date
+      plan_start_days: -56
+      core_due_days: -14
+  - key: tier_2
+    label: Tier 2
+    rank: 2
+    description: A targeted launch.
+    examples: [A significant improvement for one segment]
+    criteria:
+      - { key: revenue_impact, label: Revenue impact, description: Moderate expected revenue impact. }
+      - { key: strategic_fit, label: Strategic fit, description: Supports a stated priority. }
+      - { key: market_visibility, label: Market visibility, description: Visible to a target segment. }
+      - { key: enablement_need, label: Enablement need, description: Some teams need enablement. }
+    channels: [email, web]
+    core: [beta_invitation, battlecard]
+  - key: tier_3
+    label: Tier 3
+    rank: 3
+    description: Release-note level.
+    examples: [A small improvement listed in the monthly release notes]
+    criteria:
+      - { key: revenue_impact, label: Revenue impact, description: Little direct revenue impact. }
+      - { key: strategic_fit, label: Strategic fit, description: Incremental. }
+      - { key: market_visibility, label: Market visibility, description: Low. }
+      - { key: enablement_need, label: Enablement need, description: Documentation is enough. }
+    channels: [web]
+    core:
+      - gtm_brief
+      - tier_classification
+      - solution_messaging
+      - capability_summary
+      - master_narrative
+      - one_pager
+      - release_digest
+      - launch_video_customer
+      - launch_video_internal
+
+triggers:
+  - key: needs_setup
+    label: Needs setup
+    description: The customer has to set something up before they can use it.
+    context_key: demo.needs_setup
+    assets: [capability_summary]

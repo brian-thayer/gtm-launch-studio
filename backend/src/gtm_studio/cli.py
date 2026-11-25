@@ -13,10 +13,12 @@ from gtm_studio.api.openapi import render_openapi
 from gtm_studio.audit.logging import configure_logging
 from gtm_studio.auth.dev_users import load_dev_users
 from gtm_studio.catalog.loader import CatalogLoadError, catalog_present, load_catalog
+from gtm_studio.catalog.source import check_catalog
+from gtm_studio.catalog.todos import MARKER, count_todos
 from gtm_studio.db import migrate
 from gtm_studio.db.engine import make_engine, make_session_factory
 from gtm_studio.db.uow import SqlUnitOfWork
-from gtm_studio.domain.catalog import Catalog
+from gtm_studio.domain.catalog import Catalog, IssueSummary
 from gtm_studio.services.identity import IdentityService, SeedError
 from gtm_studio.services.ports import UnitOfWorkFactory
 from gtm_studio.settings import Settings
@@ -218,6 +220,41 @@ def catalog_show(
         typer.echo(str(exc), err=True)
         raise typer.Exit(1) from exc
     typer.echo(_render_catalog(catalog))
+
+
+@catalog_app.command("validate")
+def catalog_validate(
+    path: Annotated[
+        Path | None,
+        typer.Option(
+            "--path", help="Catalog folder, relative to the working directory. Default: GTM_CATALOG_DIR."
+        ),
+    ] = None,
+    strict: Annotated[
+        bool, typer.Option("--strict", help="Count warnings as errors (TODO markers stay warnings).")
+    ] = False,
+) -> None:
+    """List every problem in a catalog. Exits 1 when there is an error."""
+    root = path if path is not None else Settings().catalog_dir
+    if not catalog_present(root):
+        typer.echo(f"no catalog at {root}", err=True)
+        raise typer.Exit(1)
+    todos = count_todos(root)
+    catalog, issues = check_catalog(root, strict=strict, todos=todos)
+    summary = IssueSummary(
+        errors=sum(issue.level == "error" for issue in issues),
+        warnings=sum(issue.level == "warning" for issue in issues),
+        todo_count=sum(todos.values()) if catalog is not None else 0,
+    )
+    typer.echo("issues")
+    for line in _table([[issue.level, issue.where, issue.message] for issue in issues]):
+        typer.echo(line)
+    typer.echo("")
+    typer.echo(f"{summary.errors} errors, {summary.warnings} warnings, {summary.todo_count} {MARKER}")
+    if catalog is not None:
+        typer.echo(f"version {catalog.version_hash}")
+    if summary.errors:
+        raise typer.Exit(1)
 
 
 @app.command()

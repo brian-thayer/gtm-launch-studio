@@ -1,0 +1,9 @@
+# DEMO ONLY: synthetic, not a real company's GTM framework
+key: solution_messaging
+name: "Solution Messaging"
+gate: solution_defined
+audience: internal
+family: generic_doc
+depends_on: [gtm_brief]
+formats: [html, md, json, docx]
+effort: high

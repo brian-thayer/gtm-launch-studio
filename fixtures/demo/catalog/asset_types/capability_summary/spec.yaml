@@ -1,0 +1,8 @@
+# DEMO ONLY: synthetic, not a real company's GTM framework
+key: capability_summary
+name: "Capability Summary"
+gate: solution_defined
+audience: internal
+family: generic_doc
+formats: [html, md, json, docx]
+required_context: [aha.capabilities]

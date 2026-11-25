@@ -275,3 +275,18 @@ class Catalog(_Model):
         named = {key for tier in self.tiers.tiers for key in (*tier.core, *tier.optional)}
         named |= {key for trigger in self.tiers.triggers for key in trigger.assets}
         return named - self.asset_types.keys()
+
+
+# ------------------------------------------------------------- validation
+class Issue(_Model):
+    """One problem found in a catalog. ``where`` is catalog-relative, e.g. ``tiers.yaml: tiers[t1].core``."""
+
+    level: Literal["error", "warning"]
+    where: str
+    message: str
+
+
+class IssueSummary(_Model):
+    errors: int
+    warnings: int
+    todo_count: int  # TODO(confirm) markers in the files: counted by the loader side, never errors

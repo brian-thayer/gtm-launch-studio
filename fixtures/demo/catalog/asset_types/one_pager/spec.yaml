@@ -1,0 +1,8 @@
+# DEMO ONLY: synthetic, not a real company's GTM framework
+key: one_pager
+name: "One-Pager & Enablement"
+gate: ga_candidate
+audience: external
+family: generic_doc
+depends_on: [master_narrative]
+formats: [html, md, json, docx, pdf]

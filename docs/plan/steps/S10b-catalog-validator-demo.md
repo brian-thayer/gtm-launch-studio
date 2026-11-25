@@ -1,6 +1,6 @@
 # S10b: Catalog validator, `gtm catalog validate`, demo catalog
 
-Status: todo
+Status: done
 Milestone: M2
 Depends on: S10
 Human in the loop: no
@@ -107,3 +107,20 @@ uv run gtm catalog validate --path ../fixtures/demo/catalog && uv run gtm catalo
 - The user's real catalog (S11–S14).
 
 ## Notes
+- **Size:** about 940 lines of source and tests against the 450 budget (about 2×). Every acceptance criterion is met; the overrun is mostly the one-test-per-rule requirement (41 test functions in `test_catalog_rules.py`, 350 lines once the formatter wraps them) plus 7 CLI tests for `gtm catalog validate` that the card's test list did not name.
+- **Choices where the card was open:**
+  - "A tier with no `core` assets" looks at the tier's *effective* core (`Catalog.core_assets`), so with `inherits_lower` a tier whose own list is empty but that inherits is not warned. Under `--strict` that warning would otherwise fail a valid catalog.
+  - "Duplicate keys" for context keys and asset types: both are dicts, so a repeat can only appear as an entry filed under another name. The validator reports duplicates among the declared keys and any entry whose declared key differs from the name it is filed under.
+  - One rule beyond the list: an empty `approver_roles: []` override on an asset is an error (nobody could approve it). Cheap, and it is the same family as "a gate with no approver roles".
+  - The CLI's `M warnings` counts every warning row in the table, including the one-per-file `TODO(confirm)` warnings; `K TODO(confirm)` is the number of markers.
+  - `check_catalog` appends the TODO warnings after the validator's ordered list instead of merging them into it.
+- **Demo catalog:** ported `release_cutoff_values` and `readiness_categories` too (the card named only `approved_gate_values`). `tier_1.core` is empty because none of the 11 assets was tier-1-only (it inherits tiers 2 and 3), and no asset is optional. The old "Product + PMM + CS" style approvers became any-of role lists (a YAML comment says so). The old `company_name` became a `product_names` entry and `logo_text` went under `visual.yaml: slide`, because `Terminology` and `Visual` forbid extra fields.
+- **More deviations the reviewer pointed out:**
+  - Every Markdown file in the demo catalog carries the marker as an HTML comment (`<!-- DEMO ONLY: ... -->`), not only the ones with frontmatter. The card asks for `# DEMO ONLY: ...` on a Markdown file without frontmatter, but that would be a heading inside the prompt and brand text the model reads. `test_demo_catalog.py::_marked` encodes the choice.
+  - Three demo specs have `required_context` the old POC did not (`gtm_brief`: `aha.name`, `aha.description`; `capability_summary`: `aha.capabilities`; `battlecard`: `aha.competitors`). It exercises the rule, and S32's readiness checks on the demo will see it.
+  - `check_catalog` gained an optional `todos=` argument, so `gtm catalog validate` counts the markers once and its summary line can't disagree with its table.
+- **Follow-ups (not done, out of scope):**
+  - The demo's only trigger (`needs_setup` -> `capability_summary`) names an asset that is already core for every tier, so it adds nothing to any plan. S32 and e2e need a demo trigger on an asset that is not already core (for example an optional-only one) to show a trigger working.
+  - The validator does not check `readiness_categories[].gates`, a trigger with `tiers: []` (applies to no tier), `plan_start_days` / `core_due_days` signs, or asset keys repeated within one tier list.
+  - "Asset type that no tier or trigger references" ignores `depends_on`, as the card says. S32 may want a dependency-only foundation asset to count.
+  - S11 should ask whether a gate ever needs *all* of its roles to sign off (the model is any-of).

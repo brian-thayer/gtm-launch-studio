@@ -1,0 +1,8 @@
+# DEMO ONLY: synthetic, not a real company's GTM framework
+key: beta_invitation
+name: "Beta Invitation"
+gate: beta_approved
+audience: external
+family: generic_doc
+depends_on: [solution_messaging]
+formats: [html, md, json, docx]

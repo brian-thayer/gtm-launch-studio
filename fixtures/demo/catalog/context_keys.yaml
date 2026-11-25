@@ -1,0 +1,28 @@
+# DEMO ONLY: synthetic, not a real company's GTM framework
+# The fact keys of the first POC's Aha! fields (FIELD_LABELS in its context pack builder), as aha.<field>.
+context_keys:
+  - { key: aha.name, label: Solution name, description: The solution's name., type: text, sources: [aha] }
+  - { key: aha.description, label: Description, description: What the solution is., type: text, sources: [aha, document] }
+  - { key: aha.workflow_status, label: Aha! workflow status, description: The solution's status in Aha!., type: text, sources: [aha] }
+  - { key: aha.tier, label: Launch tier (from Aha!), description: The launch tier recorded in Aha!., type: number, sources: [aha] }
+  - { key: aha.product_line, label: Product line, description: The product line it belongs to., type: text, sources: [aha] }
+  - { key: aha.release, label: Target release, description: The release it ships in., type: text, sources: [aha] }
+  - { key: aha.target_ga_date, label: Target GA date, description: When it is planned to reach general availability., type: date, sources: [aha, qa] }
+  - { key: aha.target_personas, label: Target persona, description: Who it is for., type: list, sources: [aha, document, qa] }
+  - { key: aha.target_segments, label: Target segment / vertical, description: The segments and verticals it targets., type: list, sources: [aha, document, qa] }
+  - { key: aha.competitors, label: Named competitor, description: Competitors it is positioned against., type: list, sources: [aha, document, note] }
+  - { key: aha.capabilities, label: Capability, description: What the solution can do., type: list, sources: [aha, document, note, qa] }
+  - { key: aha.pricing_notes, label: Pricing / packaging, description: How it is priced and packaged., type: text, sources: [aha, document, note, qa] }
+  - { key: aha.known_limitations, label: Known limitation, description: What it does not do yet or at all., type: list, sources: [aha, document, note, qa] }
+  - { key: aha.success_metrics, label: Success metric, description: How success is measured., type: list, sources: [aha, document, qa] }
+  - { key: aha.strategic_positioning, label: Strategic positioning, description: How it fits the company strategy., type: text, sources: [aha, document, note, qa] }
+  - { key: aha.theme, label: Theme, description: The Aha! theme it rolls up to., type: text, sources: [aha] }
+  - { key: aha.opportunity, label: Opportunity (customer problem), description: The customer problem it addresses., type: text, sources: [aha, document] }
+  - { key: aha.problem_statement, label: Problem statement, description: The opportunity description., type: text, sources: [aha, document, note, qa] }
+  - { key: aha.initiative, label: Parent initiative, description: The initiative it belongs to., type: text, sources: [aha] }
+  - { key: aha.initiative_description, label: Initiative / business outcome, description: The business outcome of the initiative., type: text, sources: [aha] }
+  - { key: aha.initiative_objectives, label: Initiative objectives, description: The initiative's objectives., type: list, sources: [aha] }
+  - { key: aha.pmm_owner, label: PMM owner, description: The product marketing owner., type: text, sources: [aha] }
+  - { key: aha.product_owner, label: Product owner, description: The product owner., type: text, sources: [aha] }
+  - { key: aha.cs_owner, label: CS owner, description: The customer success owner., type: text, sources: [aha] }
+  - { key: demo.needs_setup, label: Needs setup, description: Whether the customer has to set something up first., type: boolean, sources: [qa, note] }

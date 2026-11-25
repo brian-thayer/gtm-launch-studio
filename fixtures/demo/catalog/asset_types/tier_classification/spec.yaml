@@ -1,0 +1,10 @@
+# DEMO ONLY: synthetic, not a real company's GTM framework
+key: tier_classification
+name: "Tier Classification"
+gate: opportunity_approved
+audience: internal
+family: classification
+foundation: true
+decides: tier
+formats: [html, md, json, docx]
+effort: high

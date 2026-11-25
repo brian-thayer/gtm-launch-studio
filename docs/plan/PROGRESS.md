@@ -243,3 +243,29 @@ Newest entries go at the bottom. Each step appends one entry: what was built, an
   - `uv run gtm catalog show --path tests/fixtures/catalog_min` exits 0 with the hash `4c76dcff74e9` and the 2 × 2 matrix (`tier_big`: `gate_one` [brief, classify], `gate_two` [deep_dive]; `tier_small`: `gate_one` [brief, classify], `gate_two` []);
   - `grep -rn -i -E "gate_one|tier_big|brief|battlecard|vonage" src/gtm_studio` finds nothing.
 
+
+## S10b Catalog validator, `gtm catalog validate`, demo catalog (2026-11-25, Sonnet)
+- Built:
+  - `domain/catalog_rules.py`: pure `validate(catalog, families=, strict=)`. It returns every problem at once, ordered by `where` then message, and covers each error rule on the card (duplicate keys, gate order and tier rank, role shape and system roles, approver roles, gates with no approvers, unknown gate or family, unknown dependency, cycle or later-gate dependency, context keys and their types, trigger tiers, core and optional overlap, tier deciders, rubric and gold-example checks, `approved_gate_values`, blank brand files). `admin` or `viewer` as an approver role is an error. The five warnings become errors with `strict`. `Issue` and `IssueSummary` are in `domain/catalog.py`;
+  - `catalog/families.py` (`KNOWN_FAMILIES`), `catalog/todos.py` (`count_todos`, over `loaded_files`) and `catalog/source.py` (`check_catalog`: a load failure is one error naming the file, otherwise the validator's issues plus one `TODO(confirm)` warning per file, never an error);
+  - `gtm catalog validate [--path P] [--strict]`: an issues table, `N errors, M warnings, K TODO(confirm)` and the hash. It exits 1 on any error or when there is no catalog;
+  - the demo catalog, `fixtures/demo/catalog/`: the 8 old gates with role-key approvers, 3 tiers (`inherits_lower`), 24 `aha.*` context keys plus `demo.needs_setup`, the brand files and 11 asset types (spec, prompt and a 4-criterion rubric each). Every file starts with the `DEMO ONLY` marker;
+  - tests (71 new): 48 rule and warning cases (42 functions, some parametrized), 10 `check_catalog` and `count_todos` tests (including the duplicate-context-key and key-versus-folder cases through the loader), 6 demo-catalog tests and 7 `validate` CLI tests. `backend/CLAUDE.md` and `fixtures/demo/README.md` are updated.
+- Deviations (reasons in the card's Notes):
+  - Markdown files carry the marker as an HTML comment, not a `#` heading;
+  - "a tier with no core assets" uses the effective core, so with `inherits_lower` an inheriting tier is not warned;
+  - one extra rule: an empty `approver_roles: []` override is an error;
+  - three demo specs have `required_context` the old POC lacked, and the demo also carries `release_cutoff_values` and `readiness_categories`;
+  - `check_catalog` takes an optional `todos=` so the CLI counts markers once;
+  - size: about 940 lines of source and tests against about 450, mostly the one-test-per-rule requirement.
+- Review: `code-reviewer` **PASS WITH NITS**, nothing blocking. Fixed: the double `count_todos` read in the CLI, a missing wrong-shape-role test for gate and spec approver lists. Recorded in Notes: the marker choice, the extra `required_context`, the demo trigger.
+- Follow-ups:
+  - S32 and e2e need a demo trigger on an asset that is not already core, to show a trigger adding an asset;
+  - the validator does not yet check `readiness_categories[].gates`, a trigger with `tiers: []`, timing offset signs or repeats within one tier list;
+  - S11 should ask whether a gate ever needs all of its roles to sign off (the model is any-of);
+  - S15 wraps `check_catalog` in `FileCatalogSource`.
+- Verification (from `backend/`):
+  - `uv run pytest` 507 passed (436 before, 71 new) in about 32 s · `ruff check` clean · `ruff format --check` 116 files formatted · `pyright` 0 errors · `lint-imports` 3 contracts kept;
+  - `uv run gtm catalog validate --path tests/fixtures/catalog_min --strict` exits 0 (`0 errors, 0 warnings, 0 TODO(confirm)`, version `4c76dcff74e9`);
+  - `uv run gtm catalog validate --path ../fixtures/demo/catalog` exits 0 (`0 errors, 11 warnings`, all "no gold examples"; version `5b4cfbe1aeac`), and `gtm catalog show` on it exits 0 with the 3 × 8 matrix;
+  - `grep -rn -i -E "gtm_brief|battlecard|tier_1|opportunity_approved|vonage" src/gtm_studio` finds only the `KNOWN_FAMILIES` line.

@@ -1,0 +1,18 @@
+# DEMO ONLY: synthetic, not a real company's GTM framework
+# Visual theme for rendered HTML, PPTX and video slides (from the first POC's theme.yaml).
+colors:
+  primary: "#7B2FF7" # purple
+  primary_light: "#B794FF"
+  dark: "#16141F" # near-black background
+  surface: "#241F33" # dark card
+  light_surface: "#F2EEFB"
+  accent: "#F5B400" # gold
+  warning: "#E5533D" # orange/red
+  success: "#1F9D55"
+  text_dark: "#16141F"
+  text_light: "#FFFFFF"
+  muted: "#6B6880"
+fonts:
+  body: "Segoe UI, Helvetica Neue, Arial, sans-serif"
+slide:
+  logo_text: "vonage." # the old theme used a text logo, not a file

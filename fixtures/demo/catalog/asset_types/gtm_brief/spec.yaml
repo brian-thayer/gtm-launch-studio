@@ -1,0 +1,10 @@
+# DEMO ONLY: synthetic, not a real company's GTM framework
+key: gtm_brief
+name: "GTM Brief"
+gate: opportunity_approved
+audience: internal
+family: generic_doc
+foundation: true
+formats: [html, md, json, docx]
+required_context: [aha.name, aha.description]
+effort: high
