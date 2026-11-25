@@ -35,7 +35,7 @@ Order: run the code steps first (S10a → S10 → S10b → S15 → S15b), becaus
 | S10 | Catalog models (core / optional / triggers / timing), loader, version hash, `gtm catalog show`, `catalog_min` | done | S10a | |
 | S10b | Catalog validator, `gtm catalog validate`, demo catalog | done | S10 | |
 | S15 | Catalog in the app: service, role sync, read API, admin reload, "no catalog" state | done | S10b | |
-| S15b | Catalog page; login follow-ups (SSO `next`, error messages, server-error page, `safeNext` parity) | todo | S15 | approve `npm install react-markdown` |
+| S15b | Catalog page; login follow-ups (SSO `next`, error messages, server-error page, `safeNext` parity) | done | S15 | approve `npm install react-markdown` |
 | S11 | Ingest tier framework and lifecycle (`/ingest-tier-framework`) | todo | S10b | **lifecycle gates and approvers, answers, sign-off** |
 | S12 | Ingest brand guidelines (`/ingest-brand-guidelines`) | todo | S10b | **review terminology and legal, logo decision** |
 | S13 | Define asset types (`/add-asset-type`) | todo | S11 | **MVP set, review** |

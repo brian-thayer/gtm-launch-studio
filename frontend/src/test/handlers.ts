@@ -4,7 +4,15 @@
  */
 import { http, HttpResponse, type HttpHandler } from "msw";
 import type { ActivityEvent, AuthOptions, Me } from "@/api/types";
-import { devOptions, devUsers } from "./fixtures";
+import {
+  briefAssetType,
+  catalogBrand,
+  catalogMatrix,
+  catalogOverview,
+  devOptions,
+  devUsers,
+  reloadOk,
+} from "./fixtures";
 
 const NOT_SIGNED_IN = { detail: "Not authenticated" };
 
@@ -78,4 +86,30 @@ export function activityHandlers({
     });
   };
   return [http.get("*/api/activity/me", serve(mine)), http.get("*/api/activity", serve(all))];
+}
+
+/** The five catalog endpoints, serving `catalogOverview`, `catalogMatrix`, `briefAssetType` and `catalogBrand`. */
+export function catalogHandlers(): HttpHandler[] {
+  return [
+    http.get("*/api/catalog", () => HttpResponse.json(catalogOverview)),
+    http.get("*/api/catalog/matrix", () => HttpResponse.json(catalogMatrix)),
+    http.get("*/api/catalog/brand", () => HttpResponse.json(catalogBrand)),
+    http.get("*/api/catalog/asset-types/:key", ({ params }) =>
+      params.key === briefAssetType.spec.key
+        ? HttpResponse.json(briefAssetType)
+        : HttpResponse.json({ detail: "no such asset type" }, { status: 404 }),
+    ),
+    http.post("*/api/catalog/reload", () => HttpResponse.json(reloadOk)),
+  ];
+}
+
+/** The state with no catalog loaded: every read answers 404 `no catalog loaded`; a reload still works. */
+export function noCatalogHandlers(): HttpHandler[] {
+  const none = () => HttpResponse.json({ detail: "no catalog loaded" }, { status: 404 });
+  return [
+    http.get("*/api/catalog", none),
+    http.get("*/api/catalog/matrix", none),
+    http.get("*/api/catalog/brand", none),
+    http.post("*/api/catalog/reload", () => HttpResponse.json(reloadOk)),
+  ];
 }

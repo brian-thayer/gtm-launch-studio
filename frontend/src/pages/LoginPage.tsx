@@ -1,21 +1,31 @@
 import { getRouteApi, useRouter } from "@tanstack/react-router";
 import { isApiError } from "@/api/client";
-import { RoleBadge } from "@/components/RoleBadge";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useAuthActions } from "@/hooks/useAuthActions";
 import { useAuthOptions } from "@/hooks/useAuthOptions";
+import { safeNext, type LoginError } from "@/lib/navigation";
 
 const loginRoute = getRouteApi("/login");
 
 /** Where the OIDC provider's flow starts (S09). A plain link: the browser leaves the app for the IdP. */
 const OIDC_LOGIN_URL = "/api/auth/oidc/login";
 
+/** What `/login?error=...` says. The backend sends the code and never any detail about the account. */
+const LOGIN_ERROR_MESSAGES: Record<LoginError, string> = {
+  denied: "Your account isn't allowed to sign in. Ask an administrator.",
+  failed: "Sign-in didn't complete. Try again.",
+};
+
 export function LoginPage() {
   const options = useAuthOptions();
   const { login } = useAuthActions();
-  const { next } = loginRoute.useSearch();
+  const { next, error } = loginRoute.useSearch();
   const router = useRouter();
+  // The backend checks `next` again; the link carries it so the SSO callback returns to the same page.
+  const target = safeNext(next);
+  const ssoHref = target ? `${OIDC_LOGIN_URL}?next=${encodeURIComponent(target)}` : OIDC_LOGIN_URL;
 
   function signInAs(userId: string) {
     login.mutate(userId, {
@@ -37,6 +47,11 @@ export function LoginPage() {
           Could not reach the server. Check that the API is running, then reload.
         </p>
       )}
+      {error && (
+        <p role="alert" className="text-destructive">
+          {LOGIN_ERROR_MESSAGES[error]}
+        </p>
+      )}
       {login.isError && (
         <p role="alert" className="text-destructive">
           Could not sign in
@@ -48,7 +63,7 @@ export function LoginPage() {
 
       {options.data?.provider === "oidc" && (
         <Button asChild>
-          <a href={OIDC_LOGIN_URL}>Sign in with SSO</a>
+          <a href={ssoHref}>Sign in with SSO</a>
         </Button>
       )}
 
@@ -67,8 +82,11 @@ export function LoginPage() {
                   <CardHeader>
                     <CardTitle>{user.display_name}</CardTitle>
                     <CardDescription className="flex flex-wrap gap-1">
+                      {/* Before sign-in there is only the role key: no label or kind to show. */}
                       {user.roles.map((role) => (
-                        <RoleBadge key={role} role={role} />
+                        <Badge key={role} variant="outline">
+                          {role}
+                        </Badge>
                       ))}
                     </CardDescription>
                   </CardHeader>

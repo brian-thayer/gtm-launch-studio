@@ -8,9 +8,11 @@ import {
   type RouterHistory,
 } from "@tanstack/react-router";
 import { AppLayout } from "@/components/AppLayout";
+import { ServerErrorPage } from "@/components/ServerErrorPage";
 import { meQuery } from "@/hooks/useMe";
-import { safeNext } from "@/lib/navigation";
+import { LOGIN_ERRORS, safeNext, type LoginError } from "@/lib/navigation";
 import { ActivityPage } from "@/pages/ActivityPage";
+import { CatalogPage } from "@/pages/CatalogPage";
 import { HomePage } from "@/pages/HomePage";
 import { LoginPage } from "@/pages/LoginPage";
 import { NotFoundPage } from "@/pages/NotFoundPage";
@@ -27,9 +29,16 @@ const loginRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/login",
   // `next` is where to go after signing in. It is user-controlled, so only same-site paths get through.
-  validateSearch: (search: Record<string, unknown>): { next?: string } => ({
+  // `error` is what the SSO callback sends back; any other value is ignored.
+  validateSearch: (search: Record<string, unknown>): { next?: string; error?: LoginError } => ({
     next: safeNext(search.next),
+    error: LOGIN_ERRORS.find((known) => known === search.error),
   }),
+  // Someone already signed in has no use for the login page. If `/me` can't be read, show the page anyway.
+  beforeLoad: async ({ context, search }) => {
+    const me = await context.queryClient.ensureQueryData(meQuery).catch(() => null);
+    if (me) throw redirect({ href: search.next ?? "/" });
+  },
   component: LoginPage,
 });
 
@@ -45,6 +54,9 @@ const authenticatedRoute = createRoute({
       });
     }
   },
+  // The guard's `/me` call can fail (a 5xx, no network). That is not "signed out", so it gets its own page.
+  // Only this route uses it: a page that fails while rendering keeps the router's stock error component.
+  errorComponent: ServerErrorPage,
   component: () => (
     <AppLayout>
       <Outlet />
@@ -64,6 +76,12 @@ const activityRoute = createRoute({
   component: ActivityPage,
 });
 
+const catalogRoute = createRoute({
+  getParentRoute: () => authenticatedRoute,
+  path: "/catalog",
+  component: CatalogPage,
+});
+
 // Unknown paths sit under the guard too: a signed-out visitor gets the login page, not a 404.
 const notFoundRoute = createRoute({
   getParentRoute: () => authenticatedRoute,
@@ -73,7 +91,7 @@ const notFoundRoute = createRoute({
 
 const routeTree = rootRoute.addChildren([
   loginRoute,
-  authenticatedRoute.addChildren([homeRoute, activityRoute, notFoundRoute]),
+  authenticatedRoute.addChildren([homeRoute, activityRoute, catalogRoute, notFoundRoute]),
 ]);
 
 /** `history` is for tests (a memory history); the app uses the browser's. */

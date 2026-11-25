@@ -2,7 +2,7 @@ import { screen, within } from "@testing-library/react";
 import { http, HttpResponse } from "msw";
 import { describe, expect, it } from "vitest";
 import { adminMe, viewerMe } from "@/test/fixtures";
-import { sessionHandlers } from "@/test/handlers";
+import { catalogHandlers, sessionHandlers } from "@/test/handlers";
 import { renderApp } from "@/test/renderApp";
 import { server } from "@/test/server";
 
@@ -24,15 +24,24 @@ describe("AppLayout", () => {
     expect(within(nav).getByRole("link", { name: "Activity" })).toBeInTheDocument();
   });
 
-  it("lists Catalog as disabled until S15", async () => {
-    server.use(...sessionHandlers({ me: viewerMe }));
+  it("links to Catalog for a user with catalog:read", async () => {
+    server.use(...sessionHandlers({ me: viewerMe }), ...catalogHandlers());
+    const { user, router } = renderApp("/");
+
+    const nav = await screen.findByRole("navigation", { name: "Main" });
+    await user.click(within(nav).getByRole("link", { name: "Catalog" }));
+
+    expect(router.state.location.pathname).toBe("/catalog");
+    expect(await screen.findByRole("heading", { level: 1, name: "Catalog" })).toBeInTheDocument();
+  });
+
+  it("hides Catalog from a user without catalog:read", async () => {
+    const noCatalogMe = { ...viewerMe, permissions: ["solution:read" as const] };
+    server.use(...sessionHandlers({ me: noCatalogMe }));
     renderApp("/");
 
     const nav = await screen.findByRole("navigation", { name: "Main" });
-    expect(within(nav).queryByRole("link", { name: /Catalog/ })).not.toBeInTheDocument();
-    expect(within(nav).getByText("Catalog").closest("[aria-disabled=true]")).toHaveTextContent(
-      "coming in S15",
-    );
+    expect(within(nav).queryByText("Catalog")).not.toBeInTheDocument();
   });
 
   it("shows who is signed in and their roles in the top bar", async () => {
@@ -42,7 +51,8 @@ describe("AppLayout", () => {
     const banner = await screen.findByRole("banner");
     expect(within(banner).getByRole("button", { name: viewerMe.display_name })).toBeInTheDocument();
     const roles = within(banner).getByRole("group", { name: "Your roles" });
-    expect(within(roles).getByText("viewer")).toBeInTheDocument();
+    // The label comes from the server (`me.role_info`), not from the role key.
+    expect(within(roles).getByText("Viewer")).toBeInTheDocument();
   });
 
   it("stays signed in and says so when signing out fails", async () => {

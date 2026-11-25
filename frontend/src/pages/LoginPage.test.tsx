@@ -1,8 +1,8 @@
 import { screen, within } from "@testing-library/react";
 import { http, HttpResponse } from "msw";
 import { describe, expect, it } from "vitest";
-import { devUsers, oidcOptions, adminMe } from "@/test/fixtures";
-import { sessionHandlers } from "@/test/handlers";
+import { activityEvent, adminMe, devUsers, oidcOptions } from "@/test/fixtures";
+import { activityHandlers, sessionHandlers } from "@/test/handlers";
 import { renderApp } from "@/test/renderApp";
 import { server } from "@/test/server";
 
@@ -52,5 +52,63 @@ describe("LoginPage", () => {
     const link = await screen.findByRole("link", { name: "Sign in with SSO" });
     expect(link).toHaveAttribute("href", "/api/auth/oidc/login");
     expect(screen.queryByText("Development login: not for production")).not.toBeInTheDocument();
+  });
+
+  it("passes next to the SSO login, encoded, so the callback returns to the same page", async () => {
+    server.use(...sessionHandlers({ me: null, options: oidcOptions }));
+    renderApp("/login?next=%2Factivity%3Faction_prefix%3Dauth.");
+
+    const link = await screen.findByRole("link", { name: "Sign in with SSO" });
+    expect(link).toHaveAttribute(
+      "href",
+      "/api/auth/oidc/login?next=%2Factivity%3Faction_prefix%3Dauth.",
+    );
+  });
+
+  it("does not pass a next that points off the site to the SSO login", async () => {
+    server.use(...sessionHandlers({ me: null, options: oidcOptions }));
+    renderApp("/login?next=//evil.example");
+
+    const link = await screen.findByRole("link", { name: "Sign in with SSO" });
+    expect(link).toHaveAttribute("href", "/api/auth/oidc/login");
+  });
+
+  it.each([
+    ["denied", "Your account isn't allowed to sign in. Ask an administrator."],
+    ["failed", "Sign-in didn't complete. Try again."],
+  ])("explains ?error=%s", async (error, message) => {
+    server.use(...sessionHandlers({ me: null, options: oidcOptions }));
+    renderApp(`/login?error=${error}`);
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(message);
+  });
+
+  it("ignores an error value it doesn't know", async () => {
+    server.use(...sessionHandlers({ me: null, options: oidcOptions }));
+    renderApp("/login?error=surprise");
+
+    await screen.findByRole("link", { name: "Sign in with SSO" });
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+
+  it("sends a signed-in user to / instead of showing the login page", async () => {
+    server.use(...sessionHandlers({ me: adminMe }));
+    const { router } = renderApp("/login");
+
+    expect(await screen.findByRole("button", { name: adminMe.display_name })).toBeInTheDocument();
+    expect(router.state.location.href).toBe("/");
+    expect(screen.queryByRole("button", { name: /^Sign in as/ })).not.toBeInTheDocument();
+  });
+
+  it("sends a signed-in user to next, query string included", async () => {
+    server.use(
+      ...sessionHandlers({ me: adminMe }),
+      ...activityHandlers({ all: [activityEvent(0)] }),
+    );
+    const { router } = renderApp("/login?next=%2Factivity%3Faction_prefix%3Dauth.");
+
+    expect(await screen.findByRole("heading", { name: "Activity" })).toBeInTheDocument();
+    expect(router.state.location.pathname).toBe("/activity");
+    expect(router.state.location.search).toEqual({ action_prefix: "auth." });
   });
 });

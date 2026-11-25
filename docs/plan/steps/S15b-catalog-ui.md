@@ -1,6 +1,6 @@
 # S15b: Catalog page, and the M1 login follow-ups
 
-Status: todo
+Status: done
 Milestone: M2
 Depends on: S15
 Human in the loop: approve `npm install react-markdown`
@@ -74,3 +74,17 @@ Manual check: `powershell -File scripts/dev.ps1`. Sign in as Avery Admin, open C
 - The dark palette and brand theming of the app itself (S39).
 
 ## Notes
+- **Deviations (S15b session):**
+  - The login page's dev-user cards show role *keys* in plain `outline` badges. `DevUserOption` has only keys (there is no `role_info` before sign-in), and `RoleBadge` now takes a `RoleInfo` and keeps no list of role keys. Everywhere else a role shows its label (the top bar says "Viewer", not "viewer").
+  - `Markdown` also passes `disallowedElements={["img"]}` (not on the card): react-markdown's defaults let `![](https://host/x)` make every viewer's browser fetch a URL that came from catalog text. A test covers it.
+  - The server-error page is `errorComponent` on `authenticatedRoute` only, not the router default, so a page that fails while rendering keeps the stock error component and isn't reported as "can't reach the server". `/login` ignores a failed `/me` and shows itself.
+  - The signed-in redirect on `/login` is the route's `beforeLoad` (`redirect({ href })`), so there is no flash of the login page.
+  - `npx shadcn add sheet` installed the stray `cn` package again (see `frontend/CLAUDE.md`): removed, and `ui/sheet.tsx` imports `@/lib/utils`.
+  - e2e waits up to 20 s for the reload result: the reload took about 3.8 s with three workers sharing the API (server-side `duration_ms`), and the default 5 s was too tight.
+  - Extra tests beyond the card: the 403 page, a failed reload (500), the Lifecycle, Tiers and Brand tabs, the asset-type filters, `/login` with a network error, and a keyboard e2e (arrow keys between tabs, Enter opens the sheet, Escape closes it).
+  - Size: about 1,000 lines of source and 700 of tests and fixtures against about 600 (plus the 131-line generated `ui/sheet.tsx`). Five tab components, a sheet and fixtures account for most of it; no backend file changed.
+- **Follow-ups:**
+  - `dev_login`'s docstring (the OpenAPI description) still says "Both outcomes are audited". The S10a card pointed at this step, but S15b has no backend change and regenerates no client: fix it in the next step that regenerates the contract.
+  - A reload took about 3.8 s on the demo catalog under parallel load. S15 already notes that `check()` and `todo_count()` read the files twice; look there first if reload stays slow.
+  - The demo trigger (`needs_setup` → `capability_summary`) appears under every tier and adds an asset that is already core, so the matrix doesn't yet show a trigger adding something new (same point as the S10b follow-up for S32 and e2e).
+  - The Catalog manual check with `scripts/dev.ps1` was covered by e2e (headless Edge), not clicked by hand. Steps for the user are in the PROGRESS entry.

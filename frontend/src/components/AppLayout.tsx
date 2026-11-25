@@ -26,8 +26,8 @@ function UserMenu({ me }: { me: Me }) {
   return (
     <div className="ml-auto flex items-center gap-3">
       <div className="flex gap-1" role="group" aria-label="Your roles">
-        {me.roles.map((role) => (
-          <RoleBadge key={role} role={role} />
+        {me.role_info.map((role) => (
+          <RoleBadge key={role.key} role={role} />
         ))}
       </div>
       <DropdownMenu>
@@ -102,12 +102,9 @@ export function AppLayout({ children }: { children: ReactNode }) {
             )}
             {can(me, "catalog:read") && (
               <li>
-                <span
-                  aria-disabled="true"
-                  className="block cursor-not-allowed rounded-md px-3 py-2 text-sm text-muted-foreground"
-                >
-                  Catalog <span className="block text-xs">coming in S15</span>
-                </span>
+                <Link to="/catalog" className={navLinkClass}>
+                  Catalog
+                </Link>
               </li>
             )}
           </ul>
