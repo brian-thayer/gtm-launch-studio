@@ -12,6 +12,7 @@ from typing import Annotated
 
 from fastapi import Depends, HTTPException, Request, status
 
+from gtm_studio.audit.context import bind_actor
 from gtm_studio.auth.session import end_session, session_user_id
 from gtm_studio.domain.identity import Actor, Permission
 from gtm_studio.services.identity import IdentityService
@@ -34,7 +35,10 @@ def optional_actor(request: Request, identity: IdentityDep) -> Actor | None:
     """The signed-in actor, or None. For the few routes that behave differently when signed in; it does
     not count as protection (the route-guard test ignores it)."""
     user_id = session_user_id(request.session)
-    return identity.get_actor(user_id) if user_id is not None else None
+    actor = identity.get_actor(user_id) if user_id is not None else None
+    if actor is not None:
+        bind_actor(actor.id)
+    return actor
 
 
 def current_actor(request: Request, identity: IdentityDep) -> Actor:
@@ -45,6 +49,7 @@ def current_actor(request: Request, identity: IdentityDep) -> Actor:
         if user_id is not None:
             end_session(request.session)  # a stale cookie: stop sending it
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "not authenticated")
+    bind_actor(actor.id)  # the access log and audit events know who this request is
     return actor
 
 

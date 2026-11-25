@@ -10,6 +10,7 @@ import typer
 from gtm_studio import __version__
 from gtm_studio.api.app import create_app
 from gtm_studio.api.openapi import render_openapi
+from gtm_studio.audit.logging import configure_logging
 from gtm_studio.db import migrate
 from gtm_studio.db.engine import make_engine, make_session_factory
 from gtm_studio.db.uow import SqlUnitOfWork
@@ -23,6 +24,14 @@ db_app = typer.Typer(help="Database migrations.", no_args_is_help=True)
 app.add_typer(db_app, name="db")
 seed_app = typer.Typer(help="Load seed data.", no_args_is_help=True)
 app.add_typer(seed_app, name="seed")
+
+
+@app.callback()
+def main(ctx: typer.Context) -> None:
+    """GTM Launch Studio."""
+    # Logs go to stderr, so `gtm openapi > file` stays clean. openapi must not depend on the machine, so
+    # it doesn't even read the environment.
+    configure_logging(Settings.defaults() if ctx.invoked_subcommand == "openapi" else Settings())
 
 
 @app.command()
@@ -116,4 +125,4 @@ def worker(
     try:
         run_idle(once=once)
     except KeyboardInterrupt:
-        typer.echo("worker stopped")
+        typer.echo("worker stopped", err=True)  # stdout is for command output

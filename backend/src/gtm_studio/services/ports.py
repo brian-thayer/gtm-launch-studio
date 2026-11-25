@@ -7,9 +7,11 @@ this file may mention SQLAlchemy. Repository ports return domain values, never O
 from collections.abc import Callable, Collection
 from datetime import datetime
 from types import TracebackType
-from typing import Protocol, Self
+from typing import Any, Protocol, Self
 
-from gtm_studio.domain.identity import RoleSource, UserRecord
+from gtm_studio.domain.audit import AuditEventView, AuditFilters
+from gtm_studio.domain.identity import Actor, RoleSource, UserRecord
+from gtm_studio.domain.pagination import Page
 
 
 class IdentityRepository(Protocol):
@@ -43,12 +45,43 @@ class IdentityRepository(Protocol):
     def set_last_login(self, user_id: str, at: datetime) -> None: ...
 
 
+class AuditLog(Protocol):
+    """The append-only trail of who did what (invariant 3)."""
+
+    def record(
+        self,
+        actor: Actor | None,
+        action: str,
+        entity_type: str,
+        entity_id: str,
+        *,
+        details: dict[str, Any] | None = None,
+        before: Any = None,
+        after: Any = None,
+    ) -> None:
+        """Add an event to the **caller's transaction**: it commits or rolls back together with the change
+        it describes, and is never committed on its own. ``actor`` is None when no signed-in person caused
+        it. ``before`` and ``after`` are the entity's state, stored only as hashes (``canonical_hash``), so
+        pass plain JSON values. ``details`` is stored as is: never put document text, prompts or secrets
+        in it.
+        """
+        ...
+
+    def query(self, filters: AuditFilters, cursor: str | None, limit: int) -> Page[AuditEventView]:
+        """Events newest first. ``cursor`` is a ``next_cursor`` from the previous page (None for the first);
+        a cursor that isn't one raises ``InvalidCursorError``."""
+        ...
+
+
 class UnitOfWork(Protocol):
     """One transaction. Entering it opens the work, leaving it cleanly commits, and leaving it with an
     exception rolls back. Repository ports are attached to it as attributes."""
 
     @property
     def identity(self) -> IdentityRepository: ...
+
+    @property
+    def audit(self) -> AuditLog: ...
 
     def __enter__(self) -> Self: ...
 

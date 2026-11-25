@@ -6,7 +6,7 @@
 - `adapters/`: implementations of the ports: `llm/` (bedrock, mock), `aha/`, `docs/`, `kb/`, `render/`, `tts/`, `storage/`.
 - `db/`: SQLAlchemy 2 typed ORM models (`db/models/`, every module imported in `db/models/__init__.py`), repositories (`db/repositories/`) and Alembic migrations (`db/migrations/`). `base.py` (`Base`, `IdMixin`, `TimestampMixin`), `engine.py` (`make_engine`, `make_session_factory`), `uow.py` (`SqlUnitOfWork`, the real `UnitOfWork`), `migrate.py` (Alembic from code), `deps.py` (`get_session`, re-exported by `api/deps.py`).
 - `auth/`: `AuthProvider` (dev, oidc), sessions, the CSRF header middleware, and the `current_actor` / `require(...)` dependencies.
-- `audit/`: the `AuditLog` service and the request-ID middleware.
+- `audit/`: `SqlAuditLog` (the `AuditLog` port), the request context (`context.py`), the request-ID and access-log middleware (`middleware.py`) and logging set-up (`logging.py`).
 - `api/`: FastAPI routers. These are thin: validate, call a service, map to a response schema.
 - `worker/`: the job queue consumer.
 - `catalog/`: the `gtm_catalog/` file loader and validator (IO). The catalog's Pydantic models are pure, so they live in `domain/catalog.py`.
@@ -30,8 +30,16 @@
   - A handler gets the caller from `auth.deps`: `current_actor` (any signed-in user, 401 otherwise) or `require(Permission.X, ...)` (403 when missing). The only open routes are `/api/health`, `/api/auth/options` and `/api/auth/dev/login`. `tests/api/test_auth.py` lists every route and fails when another one lacks `current_actor`, so add the dependency, don't extend the allowlist.
   - Permissions and "may this actor approve this gate" are pure code in `domain/identity.py`. `admin` has every permission but `can_approve(actor, gate_roles)` is true only for a holder of one of the gate's approver roles (separation of duties). Any role that isn't `admin` or `viewer` is an approver role.
   - Services get repositories from the unit of work (`uow.identity`; the ports are in `services/ports.py`, the SQLAlchemy versions in `db/repositories/`). Repositories flush and never commit. They return domain values, never ORM objects.
-  - The session is Starlette's signed cookie (`gtm_session`, httpOnly, `SameSite=Lax`, `Secure` in production, 8 h). `auth/csrf.py` rejects `POST`/`PUT`/`PATCH`/`DELETE` under `/api` without `X-Requested-With: gtm-studio`. Every new state-changing endpoint also needs an `audit_events` row (S07; until then leave `# TODO(S07): audit`).
+  - The session is Starlette's signed cookie (`gtm_session`, httpOnly, `SameSite=Lax`, `Secure` in production, 8 h). `auth/csrf.py` rejects `POST`/`PUT`/`PATCH`/`DELETE` under `/api` without `X-Requested-With: gtm-studio`. Every new state-changing endpoint also writes an audit event (next bullet).
   - Settings refuse `GTM_ENV=production` with the dev provider or the built-in `session_secret`. Dev users come from `config/dev_users.yaml` through `gtm seed dev-users`.
+- **Audit** (ADR-0002, invariant 3):
+  - A service records an event inside the unit of work that makes the change: `uow.audit.record(actor, AuditAction.X, entity_type, entity_id, details=..., before=..., after=...)`. It adds to the open transaction and never commits, so the event and the change commit or roll back together (`tests/service/test_audit.py` proves both directions). Never open a second unit of work for the event.
+  - Add each new action to `AuditAction` in `domain/audit.py` (`<area>.<verb>`; the stored value is the plain string, so never change one). `actor=None` means no signed-in person (a background job, or a failed sign-in) and stores `actor_display="system"`.
+  - `before` / `after` are plain JSON values and are stored only as `canonical_hash`es. `details` is stored as is and is shown to anyone with `audit:read`: no document text, prompts or secrets in it.
+  - The request fields (request ID, IP, user agent) come from `audit.context` by themselves. `current_actor` binds the actor to the request for the access log.
+  - `audit_events` is append-only: the migration adds SQLite triggers that reject UPDATE and DELETE (Postgres uses `REVOKE`, S09's `docs/hosting.md`). The table has `occurred_at` instead of `created_at` and no `updated_at`. Never write a migration that alters rows in it.
+  - `SqlAuditLog` stamps each event strictly later than the last one in the process: the Windows clock ticks every 1 to 15 ms, and events in one transaction would otherwise tie and sort by random ID.
+  - Read it through `ActivityService` (`GET /api/activity` needs `audit:read`; `GET /api/activity/me` is any signed-in user's own events). Pagination is keyset on `(occurred_at, id)` behind an opaque cursor.
 - Every router sets `tags`: operation IDs are `<tag>_<function name>`, and they end up in the generated TypeScript client.
 - **The OpenAPI schema never depends on settings.** Mount every route unconditionally and decide inside the handler (a disabled feature answers 404). `gtm openapi` builds the app from `Settings.defaults()`, and the contract test compares its output to `frontend/openapi.json`. Use `gtm_studio.api.openapi.render_openapi` for any serialization.
 - Everything is under `/api`, including the interactive docs (`/api/docs`, off when `GTM_ENV=production`).
@@ -42,6 +50,10 @@
 - stdout belongs to command output (`gtm openapi > file`). Logs go to stderr.
 - Errors: raise domain exceptions in services, and map them to HTTP codes in one exception handler.
 - Logging: `structlog.get_logger()`. Never `print`. Never log prompt bodies, document text or secrets at info level.
+  - `audit.logging.configure_logging(settings)` sets it up once per process: JSON lines unless `env=dev` (console), everything on stderr, stdlib logging (uvicorn, alembic) through the same renderer. The `gtm` Typer callback and the app lifespan call it, not `create_app` (building the app stays silent), and it does nothing when structlog is already configured (so a test's `capture_logs()` is safe).
+  - `RequestContextMiddleware` is the outermost middleware: every response carries `X-Request-ID` (an inbound one is kept only if it matches `[A-Za-z0-9-]{8,64}`), and one `request` line is logged with `method`, `path` (no query string), `status`, `duration_ms` and `actor_id`. It never reads a body. uvicorn's own access log is silenced because it prints the query string.
+  - `audit.logging.QUIET_LIBRARIES` (httpx, anthropic, boto3, SQLAlchemy engine, ...) are held at WARNING whatever `GTM_LOG_LEVEL` is, because at INFO or DEBUG they log URLs, SQL parameters or message bodies. Add a client library there when you add one.
+  - uvicorn prints "Started server process" and "Waiting for application startup" before the lifespan runs, so those two lines stay plain text.
 
 ## Tests (`tests/`)
 - `tests/unit/` covers domain code, with no DB.
@@ -52,4 +64,6 @@
 - pytest runs in `importlib` import mode: test folders have no `__init__.py`, and tests can't import from `conftest.py` or from each other. Share code through fixtures, or put it in `src/`.
 - An autouse fixture removes `GTM_*` variables and disables the `.env` file, so tests never see the developer's machine. Build settings with `Settings(env="test", ...)` (the `settings` fixture). Don't pass `_env_file=`: pyright rejects it. To test `.env` loading, `monkeypatch.setitem(Settings.model_config, "env_file", path)`.
 - A test client needs `with TestClient(app)` (the `client` fixture does this) so the lifespan runs.
+- Logging in tests: an autouse fixture puts structlog and the stdlib loggers back after every test, because the app and the CLI configure them process-wide. To assert on log lines, use the `stderr_logs()` fixture (JSON lines written to stderr since the last call); `structlog.testing.capture_logs()` still works for single events but doesn't see bound request context.
+- Never assert that two separate clock reads are equal or ordered: the Windows clock ticks every 1 to 15 ms. (`test_db_base.py::test_timestamps_are_set_in_python_and_come_back_as_aware_utc` flakes for this reason, roughly 1 run in 12 when the tick is 1 ms; see the S07 card notes.)
 - When porting from the old POC, port its test cases first. They are the behavioural spec.

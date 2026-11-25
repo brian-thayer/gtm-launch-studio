@@ -12,10 +12,12 @@ from typing import Any
 import yaml
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator
 
-from gtm_studio.domain.identity import Actor, UserRecord
+from gtm_studio.domain.audit import AuditAction
+from gtm_studio.domain.identity import Actor, AuthProviderName, UserRecord
 from gtm_studio.services.ports import UnitOfWorkFactory
 
 _ROLE_KEY = re.compile(r"[a-z][a-z0-9_]{0,49}")
+USER_ENTITY = "user"  # audit_events.entity_type for a user
 
 
 class DevUserSeed(BaseModel):
@@ -132,9 +134,25 @@ class IdentityService:
         with self._uow_factory() as uow:
             return uow.identity.list_active_users()
 
-    def record_login(self, user_id: str) -> None:
+    def record_login(self, actor: Actor, provider: AuthProviderName) -> None:
+        """A person signed in: stamp their last login and audit it, in one transaction."""
         with self._uow_factory() as uow:
-            uow.identity.set_last_login(user_id, self._clock())
+            uow.identity.set_last_login(actor.id, self._clock())
+            uow.audit.record(
+                actor, AuditAction.AUTH_LOGIN, USER_ENTITY, actor.id, details={"provider": provider}
+            )
+
+    def record_logout(self, actor: Actor) -> None:
+        with self._uow_factory() as uow:
+            uow.audit.record(actor, AuditAction.AUTH_LOGOUT, USER_ENTITY, actor.id)
+
+    def record_login_denied(self, user_id: str, provider: AuthProviderName) -> None:
+        """Someone tried to sign in as a user who doesn't exist or is inactive. There is no actor; the
+        user ID they tried is the entity (the login schema caps it at 36 characters)."""
+        with self._uow_factory() as uow:
+            uow.audit.record(
+                None, AuditAction.AUTH_LOGIN_DENIED, USER_ENTITY, user_id, details={"provider": provider}
+            )
 
 
 def _same_user(a: UserRecord, b: UserRecord) -> bool:

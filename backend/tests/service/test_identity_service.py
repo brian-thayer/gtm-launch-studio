@@ -152,7 +152,10 @@ def test_record_login_stamps_last_login_with_the_clock(
     uow_factory: UnitOfWorkFactory, seeded: SeedSummary
 ) -> None:
     moment = datetime(2026, 1, 2, 3, 4, 5, tzinfo=UTC)
-    IdentityService(uow_factory, clock=lambda: moment).record_login(ADMIN_ID)
+    service = IdentityService(uow_factory, clock=lambda: moment)
+    actor = service.get_actor(ADMIN_ID)
+    assert actor is not None
+    service.record_login(actor, "dev")
     with uow_factory() as uow:
         user = uow.identity.get_user(ADMIN_ID)
     assert user is not None

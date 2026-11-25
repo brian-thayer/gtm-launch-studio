@@ -21,7 +21,9 @@ from fastapi.routing import APIRoute
 from starlette.middleware.sessions import SessionMiddleware
 
 from gtm_studio import __version__
-from gtm_studio.api.routes import auth, health
+from gtm_studio.api.routes import activity, auth, health
+from gtm_studio.audit.logging import configure_logging
+from gtm_studio.audit.middleware import REQUEST_ID_HEADER, RequestContextMiddleware
 from gtm_studio.auth.csrf import CsrfHeaderMiddleware
 from gtm_studio.auth.session import SESSION_COOKIE, SESSION_MAX_AGE
 from gtm_studio.db.engine import make_engine, make_session_factory
@@ -43,6 +45,9 @@ def _operation_id(route: APIRoute) -> str:
 async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
     """Open the database for the life of the process. It does not migrate: run ``gtm db upgrade``."""
     settings: Settings = app.state.settings
+    # Here and not in create_app: it changes process-wide logging, and building the app must stay silent.
+    # uvicorn starts without going through the `gtm` CLI, so this is where the served API gets JSON logs.
+    configure_logging(settings)
     if settings.env == "dev" and settings.session_secret.get_secret_value() == DEV_SESSION_SECRET:
         # Here and not in create_app: building the app must stay silent (`gtm openapi` prints to stdout).
         log.warning("using the built-in session secret: set GTM_SESSION_SECRET before sharing this instance")
@@ -73,9 +78,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         lifespan=_lifespan,
     )
     app.state.settings = settings
-    # Middleware runs in reverse order of adding: CORS first (so even a CSRF 403 carries CORS headers),
-    # then the CSRF header check, then the session. Middleware adds no routes, so none of this changes
-    # the OpenAPI schema.
+    # Middleware runs in reverse order of adding: the request context first (so every response, a CSRF 403
+    # or a CORS preflight included, carries an X-Request-ID and gets an access line), then CORS (so even a
+    # CSRF 403 carries CORS headers), then the CSRF header check, then the session. Middleware adds no
+    # routes, so none of this changes the OpenAPI schema.
     app.add_middleware(
         SessionMiddleware,
         secret_key=settings.session_secret.get_secret_value(),
@@ -92,8 +98,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             allow_origins=settings.cors_origins,
             allow_credentials=True,  # the session cookie
             allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE"],
-            allow_headers=["Content-Type", "X-Requested-With"],
+            allow_headers=["Content-Type", "X-Requested-With", REQUEST_ID_HEADER],
+            expose_headers=[REQUEST_ID_HEADER],  # so the frontend can show it in an error message
         )
+    app.add_middleware(RequestContextMiddleware)
     app.include_router(health.router, prefix=API_PREFIX)
     app.include_router(auth.router, prefix=API_PREFIX)
+    app.include_router(activity.router, prefix=API_PREFIX)
     return app

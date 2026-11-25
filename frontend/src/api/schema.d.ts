@@ -4,6 +4,46 @@
  */
 
 export interface paths {
+    "/api/activity": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Activity
+         * @description Every audit event, newest first. Needs the `audit:read` permission.
+         */
+        get: operations["activity_list_activity"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/activity/me": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List My Activity
+         * @description The signed-in user's own audit events, newest first.
+         */
+        get: operations["activity_list_my_activity"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/auth/dev/login": {
         parameters: {
             query?: never;
@@ -16,6 +56,7 @@ export interface paths {
         /**
          * Dev Login
          * @description Sign in as a seeded user. 404 for an unknown or inactive user, and whenever the provider isn't dev.
+         *     Both outcomes are audited (`auth.login`, `auth.login_denied`).
          */
         post: operations["auth_dev_login"];
         delete?: never;
@@ -99,6 +140,50 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** ActivityEvent */
+        ActivityEvent: {
+            /** Action */
+            action: string;
+            /** Actor Display */
+            actor_display: string;
+            /** Actor User Id */
+            actor_user_id: string | null;
+            /** After Hash */
+            after_hash: string | null;
+            /** Before Hash */
+            before_hash: string | null;
+            /** Details */
+            details: {
+                [key: string]: unknown;
+            };
+            /** Entity Id */
+            entity_id: string;
+            /** Entity Type */
+            entity_type: string;
+            /** Id */
+            id: string;
+            /** Ip */
+            ip: string | null;
+            /**
+             * Occurred At
+             * Format: date-time
+             */
+            occurred_at: string;
+            /** Request Id */
+            request_id: string | null;
+            /** User Agent */
+            user_agent: string | null;
+        };
+        /**
+         * ActivityPage
+         * @description Newest first. Pass ``next_cursor`` back as ``cursor`` for the following page; None means the end.
+         */
+        ActivityPage: {
+            /** Items */
+            items: components["schemas"]["ActivityEvent"][];
+            /** Next Cursor */
+            next_cursor: string | null;
+        };
         /**
          * AuthOptions
          * @description What the login page shows. ``dev_users`` is filled only for the dev provider.
@@ -191,6 +276,82 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    activity_list_activity: {
+        parameters: {
+            query?: {
+                /** @description Only this user's events. */
+                actor_id?: string | null;
+                /** @description `next_cursor` of the previous page. Opaque. */
+                cursor?: string | null;
+                limit?: number;
+                entity_type?: string | null;
+                entity_id?: string | null;
+                /** @description Match actions that start with this, e.g. `asset.`. */
+                action_prefix?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ActivityPage"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    activity_list_my_activity: {
+        parameters: {
+            query?: {
+                /** @description `next_cursor` of the previous page. Opaque. */
+                cursor?: string | null;
+                limit?: number;
+                entity_type?: string | null;
+                entity_id?: string | null;
+                /** @description Match actions that start with this, e.g. `asset.`. */
+                action_prefix?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ActivityPage"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     auth_dev_login: {
         parameters: {
             query?: never;

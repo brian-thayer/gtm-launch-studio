@@ -19,7 +19,7 @@ You implement **one** step card in the GTM Launch Studio repo. The card is your 
 - Never call AWS Bedrock or set `GTM_ALLOW_BEDROCK`. Use `MockLLM`.
 - Never read `.env` files. Never write to `../GTM Operating System/`.
 - Never put GTM taxonomy (gate, tier or asset names), brand terms or company names in code; they belong in `gtm_catalog/` or `config/`.
-- Every state-changing endpoint needs auth, a permission check and an audit event (once S06/S07 exist).
+- Every state-changing endpoint needs auth and a permission check (`current_actor` / `require(...)`) and an audit event written in the same unit of work as the change (`uow.audit.record(...)`, see `backend/CLAUDE.md`).
 - Don't commit. The calling skill handles git.
 
 ## Report back (final message)

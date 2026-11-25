@@ -1,11 +1,15 @@
 """Shared fixtures. Tests never read the developer's real backend/.env or GTM_* environment."""
 
+import json
+import logging
 import os
 from collections.abc import Callable, Iterator
 from functools import partial
 from pathlib import Path
+from typing import Any
 
 import pytest
+import structlog
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from sqlalchemy import Engine
@@ -13,6 +17,7 @@ from sqlalchemy.orm import Session
 
 from gtm_studio.api.app import create_app
 from gtm_studio.api.introspection import RouteInfo, list_routes
+from gtm_studio.audit.logging import QUIET_LIBRARIES, StderrHandler, configure_logging
 from gtm_studio.db.engine import make_engine, make_session_factory
 from gtm_studio.db.migrate import upgrade
 from gtm_studio.db.uow import SqlUnitOfWork
@@ -31,6 +36,44 @@ def _isolate_settings_from_machine(monkeypatch: pytest.MonkeyPatch) -> None:
     for name in [n for n in os.environ if n.startswith("GTM_")]:
         monkeypatch.delenv(name)
     monkeypatch.setitem(Settings.model_config, "env_file", None)
+
+
+_SERVER_LOGGERS = ("uvicorn", "uvicorn.error", "uvicorn.access")
+
+
+@pytest.fixture(autouse=True)
+def _restore_logging() -> Iterator[None]:
+    """``configure_logging`` (called by app start-up and the CLI) changes process-wide state. Put it back
+    after every test, so one test's logging setup never reaches the next."""
+    root = logging.getLogger()
+    level = root.level
+    servers = {
+        name: (logging.getLogger(name).handlers[:], logging.getLogger(name).propagate)
+        for name in _SERVER_LOGGERS
+    }
+    library_levels = {name: logging.getLogger(name).level for name in QUIET_LIBRARIES}
+    yield
+    structlog.reset_defaults()
+    root.handlers[:] = [h for h in root.handlers if not isinstance(h, StderrHandler)]
+    root.setLevel(level)
+    for name, (handlers, propagate) in servers.items():
+        logging.getLogger(name).handlers[:] = handlers
+        logging.getLogger(name).propagate = propagate
+    for name, library_level in library_levels.items():
+        logging.getLogger(name).setLevel(library_level)
+
+
+@pytest.fixture
+def stderr_logs(settings: Settings, capsys: pytest.CaptureFixture[str]) -> Callable[[], list[dict[str, Any]]]:
+    """Configure logging as the app does (JSON, because ``settings.env`` is ``test``) and return a function
+    that gives the JSON log lines written to stderr since it was last called."""
+    configure_logging(settings)
+
+    def read() -> list[dict[str, Any]]:
+        lines = capsys.readouterr().err.splitlines()
+        return [json.loads(line) for line in lines if line.startswith("{")]
+
+    return read
 
 
 @pytest.fixture

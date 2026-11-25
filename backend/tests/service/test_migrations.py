@@ -29,7 +29,7 @@ def test_a_fresh_database_is_not_migrated_and_asking_does_not_create_it(
 
 
 def test_upgrade_creates_app_meta_with_an_install_id(settings: Settings, migrated_engine: Engine) -> None:
-    assert migrate.current(settings) == "0002_identity" == migrate.head(settings)
+    assert migrate.current(settings) == "0003_audit_events" == migrate.head(settings)
     assert {"app_meta", "alembic_version"} <= _tables(migrated_engine)
     with Session(migrated_engine) as session:
         install_id = session.scalars(select(AppMeta.value).where(AppMeta.key == INSTALL_ID_KEY)).one()

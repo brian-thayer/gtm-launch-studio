@@ -5,6 +5,7 @@ from typing import Self
 
 from sqlalchemy.orm import Session, sessionmaker
 
+from gtm_studio.audit.sql_audit_log import SqlAuditLog
 from gtm_studio.db.repositories.identity import SqlIdentityRepository
 
 
@@ -14,7 +15,8 @@ class SqlUnitOfWork:
     >>> with SqlUnitOfWork(session_factory) as uow:
     ...     uow.session.add(...)
 
-    Repositories are built over ``session`` and exposed as properties (``identity``). Not reusable
+    Repositories and the audit log are built over ``session`` and exposed as properties (``identity``,
+    ``audit``), so an audit event commits or rolls back with the change it records. Not reusable
     while entered, and not thread-safe: make one per use case through a ``UnitOfWorkFactory``.
     """
 
@@ -31,6 +33,10 @@ class SqlUnitOfWork:
     @property
     def identity(self) -> SqlIdentityRepository:
         return SqlIdentityRepository(self.session)
+
+    @property
+    def audit(self) -> SqlAuditLog:
+        return SqlAuditLog(self.session)
 
     def __enter__(self) -> Self:
         if self._session is not None:
