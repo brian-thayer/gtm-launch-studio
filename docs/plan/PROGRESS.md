@@ -195,3 +195,30 @@ Newest entries go at the bottom. Each step appends one entry: what was built, an
 - Verification (clean state, `review/M1` branch):
   - backend: `uv run pytest -q` 337 passed in 30 s · `ruff check` clean · `ruff format --check` 77 files formatted · `pyright` 0 errors · `lint-imports` 3 contracts kept (before and after tightening);
   - frontend: `npm run lint` clean · `npm run typecheck` clean · `npm run test` 60 passed (11 files) · `npm run e2e` 7 passed · `npm run format:check` clean after the fix.
+
+## S10a Backend conventions from the M1 review (2026-11-25, Opus)
+- Built:
+  - one exception handler: `domain/errors.py` (`DomainError` and `NotFoundError` / `ConflictError` / `InvalidInputError` / `NotPermittedError`) and `api/errors.py` (404/409/422/403, `{"detail": ...}`), registered in `create_app`. `InvalidCursorError` and `UserConflictError` subclass them, and the activity router lost its inline `try/except` blocks;
+  - pure helpers: `domain/clock.utcnow` (re-exported by `db.base`), with `TimestampMixin` stamping `created_at` and `updated_at` from one read in a `before_insert` event; `domain/identity.check_role_key`, now the only `ROLE_KEY.fullmatch`; and `db/deps.get_uow_factory`, which both service dependencies are built on;
+  - the dev-user loader moved to `auth/dev_users.py` and `DevUserSeed` to `domain/identity.py`, so `seed_dev_users` takes parsed seeds and import-linter forbids `yaml` in `services/`;
+  - audited seeding: `user.seeded`, `user.roles_set` and (on a re-seed that changes a profile) `user.updated`, with no actor, in the seed's unit of work, and nothing on an unchanged re-seed. Dev login with an ID that names nobody is logged (`dev sign-in denied`) and not audited, decided with `IdentityService.user_exists`; an inactive user's attempt is still audited, with `reason: inactive`;
+  - migration `0004_audit_pagination_index`, which replaces `ix_audit_events_occurred_at` with `(occurred_at, id)`. A test upgrades a populated 0003 database and checks the triggers still reject UPDATE and DELETE;
+  - test databases are file copies of a session-scoped `_migrated_template`. `test_migrations.py` overrides `migrated_engine` and keeps running Alembic.
+- Deviations (reasons in the card's Notes):
+  - the extra `user.updated` event on a re-seed (invariant 3);
+  - `set_roles` returns `(added, removed)`;
+  - `UserConflictError`'s detail no longer contains the email;
+  - `dev_login`'s docstring (the OpenAPI description) is unchanged, to keep the schema byte-identical;
+  - tests that counted every event now leave out the seed's own events;
+  - size: about 800 changed lines against about 350, half of them tests.
+- Review: `code-reviewer` **PASS WITH NITS**, nothing blocking. Fixed a comment and two tests that called `record_login_denied` with an ID that names nobody.
+- Follow-ups:
+  - correct `dev_login`'s OpenAPI description when the contract is next regenerated (S15b);
+  - consider an `IdentityService.deny_dev_login` so the audit-or-log rule lives in the service (M2 review);
+  - template-copied databases share one install ID;
+  - the next test-speed saving would be a seeded template.
+- Verification (from `backend/`):
+  - `uv run pytest` 361 passed · `ruff check` clean · `ruff format --check` 83 files formatted · `pyright` 0 errors · `lint-imports` 3 contracts kept (with `yaml` now forbidden in services) · `gtm openapi | diff - ../frontend/openapi.json` no diff · `tests/service/test_db_base.py` 50 of 50 runs passed.
+  - Suite time, before (S09, 337 tests): 16.98 s by pytest's count.
+  - After (361 tests): a paired A/B on the same tests over four rounds, migrating per test against copying the template, gave medians of 23.5 s and 15.3 s, **35% faster** (26–43% per round). Plain runs took 11.87–16.7 s on a noisy machine.
+

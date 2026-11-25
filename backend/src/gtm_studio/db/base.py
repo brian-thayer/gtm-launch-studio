@@ -9,10 +9,12 @@ import uuid
 from datetime import UTC, datetime
 from typing import Any
 
-from sqlalchemy import DateTime, MetaData, String
+from sqlalchemy import Connection, DateTime, MetaData, String, event
 from sqlalchemy.engine import Dialect
-from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
+from sqlalchemy.orm import DeclarativeBase, Mapped, Mapper, mapped_column
 from sqlalchemy.types import TypeDecorator
+
+from gtm_studio.domain.clock import utcnow as utcnow  # re-export: `from gtm_studio.db.base import utcnow`
 
 NAMING_CONVENTION = {
     "ix": "ix_%(column_0_label)s",
@@ -21,10 +23,6 @@ NAMING_CONVENTION = {
     "fk": "fk_%(table_name)s_%(column_0_name)s_%(referred_table_name)s",
     "pk": "pk_%(table_name)s",
 }
-
-
-def utcnow() -> datetime:
-    return datetime.now(UTC)
 
 
 def new_id() -> str:
@@ -67,7 +65,18 @@ class IdMixin:
 
 
 class TimestampMixin:
-    """``created_at`` and ``updated_at``, set in Python (never by the database) as UTC."""
+    """``created_at`` and ``updated_at``, set in Python (never by the database) as UTC.
+
+    An ORM insert sets both from **one** clock read (``_stamp_insert``), so a new row's ``updated_at``
+    equals its ``created_at``. The column defaults only cover a Core ``insert()``, which the ORM event
+    doesn't see."""
 
     created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
     updated_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow, onupdate=utcnow)
+
+
+@event.listens_for(TimestampMixin, "before_insert", propagate=True)
+def _stamp_insert(_mapper: Mapper[Any], _connection: Connection, target: TimestampMixin) -> None:
+    # A value the caller set is kept; a missing updated_at follows created_at.
+    target.created_at = target.created_at or utcnow()
+    target.updated_at = target.updated_at or target.created_at

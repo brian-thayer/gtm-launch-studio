@@ -18,7 +18,7 @@ class AuditEvent(IdMixin, Base):
     __tablename__ = "audit_events"
     __table_args__ = (
         Index("ix_audit_events_entity_type_entity_id", "entity_type", "entity_id"),
-        Index("ix_audit_events_occurred_at", "occurred_at"),
+        Index("ix_audit_events_occurred_at_id", "occurred_at", "id"),  # keyset pagination's sort key
         Index("ix_audit_events_actor_user_id", "actor_user_id"),
     )
 

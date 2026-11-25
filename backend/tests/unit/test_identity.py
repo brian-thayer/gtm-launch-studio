@@ -5,6 +5,7 @@ from gtm_studio.domain.identity import (
     Actor,
     Permission,
     can_approve,
+    check_role_key,
     permissions_for,
 )
 
@@ -76,3 +77,14 @@ def test_admin_who_also_holds_the_role_can_approve() -> None:
 
 def test_a_viewer_cannot_approve_even_if_a_gate_lists_viewer() -> None:
     assert not can_approve(_actor("viewer"), ["viewer"])
+
+
+@pytest.mark.parametrize("key", ["pmm", "a", "growth_2", "a" * 50])
+def test_check_role_key_returns_a_valid_key(key: str) -> None:
+    assert check_role_key(key) == key
+
+
+@pytest.mark.parametrize("key", ["", "Pmm", "2pmm", "has space", "pmm-lead", "a" * 51])
+def test_check_role_key_rejects_anything_else(key: str) -> None:
+    with pytest.raises(ValueError, match=r"invalid role key .*: must be lowercase letters"):
+        check_role_key(key)

@@ -9,11 +9,14 @@ is a separate question, answered by ``can_approve`` from the gate's ``approver_r
 """
 
 import re
+import uuid
 from collections.abc import Collection, Iterable, Mapping
 from dataclasses import dataclass
 from datetime import datetime
 from enum import StrEnum
 from typing import Literal
+
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 AuthProviderName = Literal["dev", "oidc"]
 RoleSource = Literal["system", "dev_seed", "catalog", "oidc"]
@@ -23,7 +26,44 @@ VIEWER_ROLE = "viewer"
 SYSTEM_ROLES: frozenset[str] = frozenset({ADMIN_ROLE, VIEWER_ROLE})
 
 ROLE_KEY = re.compile(r"[a-z][a-z0-9_]{0,49}")
-"""What a role key may look like (``roles.key`` is 50 characters)."""
+"""What a role key may look like (``roles.key`` is 50 characters). Check one with ``check_role_key``."""
+
+
+def check_role_key(key: str) -> str:
+    """``key`` when it is a valid role key, else ``ValueError`` (so a Pydantic validator can use it)."""
+    if not ROLE_KEY.fullmatch(key):
+        raise ValueError(f"invalid role key {key!r}: must be lowercase letters, digits and underscores")
+    return key
+
+
+class DevUserSeed(BaseModel):
+    """One entry of ``config/dev_users.yaml`` (read by ``auth/dev_users.py``). The ID is fixed so tests and
+    e2e runs are stable."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    id: str
+    email: str
+    display_name: str = Field(min_length=1)
+    roles: list[str] = Field(min_length=1)
+
+    @field_validator("id")
+    @classmethod
+    def _uuid(cls, value: str) -> str:
+        return str(uuid.UUID(value))  # canonical lowercase form; raises ValueError when malformed
+
+    @field_validator("email")
+    @classmethod
+    def _email(cls, value: str) -> str:
+        value = value.strip().lower()
+        if "@" not in value:
+            raise ValueError("not an email address")
+        return value
+
+    @field_validator("roles")
+    @classmethod
+    def _role_keys(cls, value: list[str]) -> list[str]:
+        return list(dict.fromkeys(check_role_key(key) for key in value))
 
 
 class Permission(StrEnum):

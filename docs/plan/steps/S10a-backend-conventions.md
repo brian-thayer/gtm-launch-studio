@@ -1,6 +1,6 @@
 # S10a: Backend conventions from the M1 review
 
-Status: todo
+Status: done
 Milestone: M2
 Depends on: S09 (M1 done)
 Human in the loop: no
@@ -114,3 +114,20 @@ for i in $(seq 1 50); do uv run pytest -q -p no:cacheprovider tests/service/test
 - New endpoints or permissions.
 
 ## Notes
+- **Dev-login distinction:** chose `IdentityService.user_exists(user_id)`, called only after `authenticate` returned no actor, so a successful sign-in costs nothing extra. `DevAuthProvider.authenticate` is unchanged. The route still makes the decision, as the OIDC callback does. Its docstring is unchanged, because FastAPI publishes it as the OpenAPI description and the schema had to stay byte-identical; the new rule is in a comment.
+- **Deviations:**
+  - Seeding also records `user.updated` (`{"provider": "dev", "fields": [...]}`, with before/after hashes) when a re-seed changes an existing user's profile, for example a rename or reactivating a deactivated user. The card names only `user.seeded` and `user.roles_set`, but without this a state change would go unaudited (invariant 3). `_changed_profile_fields` now also compares `is_active`, `auth_provider` and `auth_subject`; the OIDC path never differs in those, so its events are unchanged.
+  - `IdentityRepository.set_roles` now returns `(added, removed)`, like `sync_source_roles` does, so `user.roles_set` records the grants that actually changed, including grants to inactive roles.
+  - `UserConflictError`'s detail no longer contains the email, because a `ConflictError` detail can reach a client. The seed's `SeedError` no longer starts with the file path, because the service no longer knows it; the loader's errors still name the file.
+  - The timestamp test now patches `db.base.utcnow` with a clock that moves forward a second on every read. That proves one read for both columns, where before it relied on two reads landing in the same tick. `TimestampMixin` uses a `before_insert` mapper event on the mixin (`propagate=True`); the column defaults remain for Core `insert()` only, which nothing in `src/` uses.
+  - Tests that counted every event (`test_audit.py`, `test_identity_oidc.py`, `test_oidc.py`) now leave out the two actions the `seeded` fixture writes. `test_request_id.py`'s request-ID-in-audit test now uses a successful login, because an unknown ID is no longer audited.
+- **Suite time:** before (S09 code, 337 tests): 16.98 s by pytest's count (20.8 s wall; a cold first run took 25.2 s). After (361 tests): an A/B on the same 361 tests, alternating `upgrade()` per test with the template copy over four rounds: migrate 21.01 / 27.52 / 23.34 / 23.68 s, copy 15.64 / 18.31 / 14.91 / 13.49 s. The medians, 23.5 s and 15.3 s, are **35% faster**; the paired rounds range from 26% to 43%. This machine is noisy: identical code ran anywhere from 16.4 to 28.7 s, so the A/B is the meaningful number. One migration costs about 36 ms and one copy about 8 ms.
+- **Size:** about 800 changed lines (608 added, 192 removed) against a budget of about 350. About half is tests: the seeding-audit tests, the 0003 → 0004 migration test, the handler probes and the helper updates the audited seed made necessary. Moved code (`DevUserSeed`, the loader) counts twice. Every acceptance criterion was met before the overrun.
+- **Review:** `code-reviewer` gave **PASS WITH NITS**, nothing blocking, and re-ran every verification command. Nits fixed: the comment on the frozen docstring, and the two service tests that called `record_login_denied` with an ID that names nobody now use an existing user. The reviewer measured 12.86 s for 361 tests (24% less in absolute terms, about 29% less per test, against the 16.98 s / 337-test "before"). The re-run after the nits took 11.87 s (30% less).
+- **Follow-ups:**
+  - `dev_login`'s docstring, which is the OpenAPI description, still says "Both outcomes are audited". Correct it in the next step that regenerates the contract (S15b's frontend work regenerates the client anyway).
+  - The "audit only if the user exists" decision sits in the router, as the card allows, and `record_login_denied` will audit any ID it is given. An `IdentityService.deny_dev_login(user_id)` that decides and either audits or logs in one unit of work would enforce ADR-0006 point 7 in the service. Consider it at the M2 review.
+  - Every test database is a copy of one template, so they all share one `app_meta` install ID. Only `test_migrations.py` reads it, and it runs Alembic itself. A step that needs a distinct install ID per database must run `upgrade` or override the fixture.
+  - The rest of each test's time is now per-test app, lifespan, seed and login work, not migrations. A session-scoped "seeded template" would be the next saving, if it is ever needed.
+  - `OidcDeniedError("email_conflict", subject)` still audits the IdP subject as the entity when no user exists yet. That is S09's rule (the IdP vouched for the person), not ADR-0006's, but worth a look at the M2 review.
+

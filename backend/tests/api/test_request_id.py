@@ -65,12 +65,11 @@ def test_the_login_access_line_names_the_person_who_just_signed_in(
 
 
 def test_the_audit_event_has_the_same_request_id_as_the_response(app: FastAPI, login_as: LoginAs) -> None:
-    anonymous = TestClient(app)
-    login = anonymous.post("/api/auth/dev/login", json={"user_id": "x"}, headers=CSRF)  # denied
-    events = (
-        login_as("admin").get("/api/activity", params={"action_prefix": "auth.login_denied"}).json()["items"]
-    )
-    assert [e["request_id"] for e in events] == [login.headers[REQUEST_ID_HEADER]]
+    pmm_id = login_as("pmm").get("/api/auth/me").json()["id"]
+    login = TestClient(app).post("/api/auth/dev/login", json={"user_id": pmm_id}, headers=CSRF)
+    params = {"action_prefix": "auth.login", "actor_id": pmm_id}
+    newest = login_as("admin").get("/api/activity", params=params).json()["items"][0]
+    assert newest["request_id"] == login.headers[REQUEST_ID_HEADER]
 
 
 def test_the_request_id_is_readable_cross_origin(settings: Settings, migrated_engine: Engine) -> None:

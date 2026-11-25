@@ -9,17 +9,19 @@ from sqlalchemy.orm import Session
 from structlog.testing import capture_logs
 
 from gtm_studio.db.models.identity import Role, UserRole
-from gtm_studio.domain.audit import AuditFilters
+from gtm_studio.domain.audit import AuditAction, AuditFilters
 from gtm_studio.services.identity import IdentityService, SeedSummary, UserConflictError
 from gtm_studio.services.ports import UnitOfWorkFactory
 
 PMM_ID = "00000000-0000-4000-8000-000000000003"
+SEED_ACTIONS = (AuditAction.USER_SEEDED, AuditAction.USER_ROLES_SET)  # what the `seeded` fixture writes
 
 
 def _events(uow_factory: UnitOfWorkFactory) -> list[tuple[str, dict[str, object]]]:
-    """(action, details) of every audit event, oldest first."""
+    """(action, details) of every audit event, oldest first, apart from the ones seeding wrote."""
     with uow_factory() as uow:
-        return [(e.action, e.details) for e in reversed(uow.audit.query(AuditFilters(), None, 100).items)]
+        items = reversed(uow.audit.query(AuditFilters(), None, 100).items)
+    return [(e.action, e.details) for e in items if e.action not in SEED_ACTIONS]
 
 
 def _grants(engine: Engine, user_id: str) -> dict[str, str]:
@@ -169,7 +171,7 @@ def test_login_audit_details_carry_the_provider_the_roles_and_the_denial_reason(
     service.record_login(actor, "oidc", roles_synced={"viewer", "pmm"})
     service.record_login(actor, "dev")
     service.record_login_denied("sub-9", "oidc", "inactive")
-    service.record_login_denied("not-a-user", "dev")
+    service.record_login_denied(PMM_ID, "dev")
     assert _events(uow_factory) == [
         ("auth.login", {"provider": "oidc", "roles_synced": ["pmm", "viewer"]}),
         ("auth.login", {"provider": "dev"}),

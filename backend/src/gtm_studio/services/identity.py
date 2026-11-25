@@ -2,61 +2,29 @@
 logins. Services see only the ports in ``services/ports.py``."""
 
 import uuid
-from collections.abc import Callable, Collection
+from collections.abc import Callable, Collection, Sequence
 from dataclasses import dataclass, replace
-from datetime import UTC, datetime
-from pathlib import Path
+from datetime import datetime
 from typing import Any
 
 import structlog
-import yaml
-from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator
 
 from gtm_studio.domain.audit import AuditAction
-from gtm_studio.domain.identity import ROLE_KEY, Actor, AuthProviderName, RoleSource, UserRecord
+from gtm_studio.domain.clock import utcnow
+from gtm_studio.domain.errors import ConflictError
+from gtm_studio.domain.identity import (
+    Actor,
+    AuthProviderName,
+    DevUserSeed,
+    RoleSource,
+    UserRecord,
+    check_role_key,
+)
 from gtm_studio.services.ports import UnitOfWorkFactory
 
 log = structlog.get_logger()
 
 USER_ENTITY = "user"  # audit_events.entity_type for a user
-
-
-class DevUserSeed(BaseModel):
-    """One entry of ``config/dev_users.yaml``. The ID is fixed so tests and e2e runs are stable."""
-
-    model_config = ConfigDict(extra="forbid")
-
-    id: str
-    email: str
-    display_name: str = Field(min_length=1)
-    roles: list[str] = Field(min_length=1)
-
-    @field_validator("id")
-    @classmethod
-    def _uuid(cls, value: str) -> str:
-        return str(uuid.UUID(value))  # canonical lowercase form; raises ValueError when malformed
-
-    @field_validator("email")
-    @classmethod
-    def _email(cls, value: str) -> str:
-        value = value.strip().lower()
-        if "@" not in value:
-            raise ValueError("not an email address")
-        return value
-
-    @field_validator("roles")
-    @classmethod
-    def _role_keys(cls, value: list[str]) -> list[str]:
-        for key in value:
-            if not ROLE_KEY.fullmatch(key):
-                raise ValueError(f"role key {key!r} must be lowercase letters, digits and underscores")
-        return list(dict.fromkeys(value))
-
-
-class DevUsersFile(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
-    users: list[DevUserSeed]
 
 
 @dataclass(frozen=True)
@@ -80,33 +48,22 @@ class SeedError(Exception):
     message is meant for the person running ``gtm seed dev-users``."""
 
 
-class UserConflictError(Exception):
+class UserConflictError(ConflictError):
     """An identity provider reported an email that already belongs to a different user. People are never
     matched by email (a mutable, sometimes unverified claim): taking over an account that way is how a
     hostile IdP tenant or a renamed mailbox would get someone else's roles."""
 
 
-def load_dev_users(path: Path) -> list[DevUserSeed]:
-    try:
-        data: Any = yaml.safe_load(path.read_text(encoding="utf-8"))
-        return DevUsersFile.model_validate(data).users
-    except (OSError, yaml.YAMLError, ValidationError) as exc:
-        raise SeedError(f"{path}: {exc}") from exc
-
-
-def _utc_now() -> datetime:
-    return datetime.now(UTC)
-
-
 class IdentityService:
-    def __init__(self, uow_factory: UnitOfWorkFactory, clock: Callable[[], datetime] = _utc_now) -> None:
+    def __init__(self, uow_factory: UnitOfWorkFactory, clock: Callable[[], datetime] = utcnow) -> None:
         self._uow_factory = uow_factory
         self._clock = clock
 
-    def seed_dev_users(self, path: Path) -> SeedSummary:
-        """Create or update the users in ``path`` and the roles they need. Safe to run again: a second
-        run with an unchanged file changes nothing. Users and roles not in the file are left alone."""
-        seeds = load_dev_users(path)
+    def seed_dev_users(self, seeds: Sequence[DevUserSeed]) -> SeedSummary:
+        """Create or update these users (``auth.dev_users.load_dev_users`` reads them) and the roles they
+        need, in one transaction. Safe to run again: an unchanged file changes nothing and audits nothing.
+        Users and roles not in the file are left alone. Each change is audited with no actor (system):
+        ``user.seeded``, ``user.updated`` and ``user.roles_set``."""
         users_created = users_updated = users_unchanged = roles_created = 0
         with self._uow_factory() as uow:
             repo = uow.identity
@@ -118,7 +75,7 @@ class IdentityService:
                 existing = repo.get_user(seed.id)
                 owner = repo.get_user_by_email(seed.email)
                 if owner is not None and owner.id != seed.id:
-                    raise SeedError(f"{path}: {seed.email} already belongs to a different user ({owner.id})")
+                    raise SeedError(f"{seed.email} already belongs to a different user ({owner.id})")
                 wanted = UserRecord(
                     id=seed.id,
                     email=seed.email,
@@ -128,16 +85,43 @@ class IdentityService:
                     auth_subject=None,
                     roles=frozenset(seed.roles),
                 )
-                if existing is None:
-                    users_created += 1
-                elif _same_user(existing, wanted):
+                if existing is not None and _same_user(existing, wanted):
                     users_unchanged += 1
                     continue
+                repo.upsert_user(wanted)
+                added, removed = repo.set_roles(seed.id, seed.roles, source="dev_seed")
+                if existing is None:
+                    users_created += 1
+                    uow.audit.record(
+                        None, AuditAction.USER_SEEDED, USER_ENTITY, seed.id, details={"provider": "dev"}
+                    )
                 else:
                     users_updated += 1
-                repo.upsert_user(wanted)
-                repo.set_roles(seed.id, seed.roles, source="dev_seed")
+                    if fields := _changed_profile_fields(existing, wanted):
+                        uow.audit.record(
+                            None,
+                            AuditAction.USER_UPDATED,
+                            USER_ENTITY,
+                            seed.id,
+                            details={"provider": "dev", "fields": fields},
+                            before=_profile(existing, fields),
+                            after=_profile(wanted, fields),
+                        )
+                if added or removed:
+                    uow.audit.record(
+                        None,
+                        AuditAction.USER_ROLES_SET,
+                        USER_ENTITY,
+                        seed.id,
+                        details={"added": sorted(added), "removed": sorted(removed)},
+                    )
         return SeedSummary(users_created, users_updated, users_unchanged, roles_created)
+
+    def user_exists(self, user_id: str) -> bool:
+        """Whether any user, active or not, has this ID. Dev login uses it to tell a sign-in that names
+        nobody (logged only) from one an existing user may not make (audited)."""
+        with self._uow_factory() as uow:
+            return uow.identity.get_user(user_id) is not None
 
     def get_actor(self, user_id: str) -> Actor | None:
         """The person behind a session. None when the user doesn't exist or has been deactivated."""
@@ -164,7 +148,8 @@ class IdentityService:
                 return existing  # checked first: whatever else is off, the refusal is for being inactive
             owner = repo.get_user_by_email(email)
             if owner is not None and (existing is None or owner.id != existing.id):
-                raise UserConflictError(f"{email} already belongs to a different user")
+                # The detail reaches a client if nothing catches it, so it names no address.
+                raise UserConflictError("the email already belongs to a different user")
             if existing is None:
                 created = UserRecord(
                     id=str(uuid.uuid4()),
@@ -202,10 +187,7 @@ class IdentityService:
         A key no role row exists for yet (for example an approver role the catalog hasn't declared) is
         created **inactive** and logged: an inactive role grants nothing, so a typo or an early mapping in
         the IdP config never hands out access by accident. Raises ``ValueError`` for a malformed key."""
-        wanted = sorted(set(role_keys))
-        for key in wanted:
-            if not ROLE_KEY.fullmatch(key):
-                raise ValueError(f"role key {key!r} must be lowercase letters, digits and underscores")
+        wanted = sorted(check_role_key(key) for key in set(role_keys))
         with self._uow_factory() as uow:
             repo = uow.identity
             for key in wanted:
@@ -241,9 +223,10 @@ class IdentityService:
     def record_login_denied(
         self, user_id: str, provider: AuthProviderName, reason: str | None = None
     ) -> None:
-        """Someone tried to sign in as a user who doesn't exist or is inactive. There is no actor; the
-        user ID they tried is the entity (at most 100 characters). ``reason`` is a short code, never free
-        text from the request."""
+        """Someone tried to sign in as an existing user who may not (inactive, say), or the IdP vouched for
+        someone we refuse. There is no actor; the user ID or subject tried is the entity (at most 100
+        characters). ``reason`` is a short code, never free text from the request. Don't call it for an ID
+        that names nobody: that is logged only (ADR-0006)."""
         details: dict[str, Any] = {"provider": provider}
         if reason is not None:
             details["reason"] = reason
@@ -251,13 +234,16 @@ class IdentityService:
             uow.audit.record(None, AuditAction.AUTH_LOGIN_DENIED, USER_ENTITY, user_id, details=details)
 
 
+_PROFILE_FIELDS = ("email", "display_name", "is_active", "auth_provider", "auth_subject")
+
+
 def _changed_profile_fields(before: UserRecord, after: UserRecord) -> list[str]:
-    fields: list[str] = []
-    if before.email != after.email:
-        fields.append("email")
-    if before.display_name != after.display_name:
-        fields.append("display_name")
-    return fields
+    """The names of the fields that differ, roles and last login aside."""
+    return [name for name in _PROFILE_FIELDS if getattr(before, name) != getattr(after, name)]
+
+
+def _profile(user: UserRecord, fields: list[str]) -> dict[str, Any]:
+    return {name: getattr(user, name) for name in fields}
 
 
 def _same_user(a: UserRecord, b: UserRecord) -> bool:

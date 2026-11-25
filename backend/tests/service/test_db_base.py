@@ -10,6 +10,7 @@ import pytest
 from sqlalchemy import Engine, MetaData, String, create_engine
 from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column
 
+from gtm_studio.db import base as db_base
 from gtm_studio.db.base import NAMING_CONVENTION, IdMixin, TimestampMixin, UTCDateTime
 
 
@@ -40,8 +41,11 @@ def test_ids_are_uuid4_strings(scratch_engine: Engine) -> None:
         assert first.id != second.id
 
 
-def test_timestamps_are_set_in_python_and_come_back_as_aware_utc(scratch_engine: Engine) -> None:
-    before = datetime.now(UTC)
+def test_timestamps_are_set_in_python_and_come_back_as_aware_utc(
+    scratch_engine: Engine, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    ticks = iter(datetime(2026, 1, 1, tzinfo=UTC) + timedelta(seconds=n) for n in range(100))
+    monkeypatch.setattr(db_base, "utcnow", lambda: next(ticks))  # every read is a second later
     with Session(scratch_engine) as session:
         session.add(_Thing(id="t1", name="a"))
         session.commit()
@@ -49,8 +53,8 @@ def test_timestamps_are_set_in_python_and_come_back_as_aware_utc(scratch_engine:
         thing = session.get_one(_Thing, "t1")
         assert thing.created_at.tzinfo is not None
         assert thing.created_at.utcoffset() == timedelta(0)  # SQLite alone would return a naive value
-        assert before <= thing.created_at <= datetime.now(UTC)
-        assert thing.updated_at == thing.created_at
+        # One clock read for both columns: a second read would have been a second later.
+        assert thing.created_at == thing.updated_at == datetime(2026, 1, 1, tzinfo=UTC)
 
 
 def test_updated_at_moves_on_update_and_created_at_does_not(scratch_engine: Engine) -> None:

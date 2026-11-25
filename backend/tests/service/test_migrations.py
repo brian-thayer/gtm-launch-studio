@@ -1,16 +1,19 @@
 import shutil
 import uuid
+from collections.abc import Iterator
 from pathlib import Path
 
 import pytest
 from alembic.autogenerate import compare_metadata
 from alembic.runtime.migration import MigrationContext
-from sqlalchemy import JSON, Boolean, Engine, Integer, String, Text, inspect, select
+from sqlalchemy import JSON, Boolean, Engine, Integer, String, Text, inspect, select, text
+from sqlalchemy.exc import DBAPIError
 from sqlalchemy.orm import Session
 
 import gtm_studio.db.models  # noqa: F401  (registers every table on Base.metadata)
 from gtm_studio.db import migrate
 from gtm_studio.db.base import Base, UTCDateTime
+from gtm_studio.db.engine import make_engine
 from gtm_studio.db.models.app_meta import INSTALL_ID_KEY, AppMeta
 from gtm_studio.settings import Settings
 
@@ -21,6 +24,17 @@ def _tables(engine: Engine) -> set[str]:
     return set(inspect(engine).get_table_names())
 
 
+@pytest.fixture
+def migrated_engine(settings: Settings) -> Iterator[Engine]:
+    """Overrides conftest's copy of the template database: these tests are about Alembic, so they run it."""
+    migrate.upgrade(settings)
+    engine = make_engine(settings)
+    try:
+        yield engine
+    finally:
+        engine.dispose()
+
+
 def test_a_fresh_database_is_not_migrated_and_asking_does_not_create_it(
     settings: Settings, tmp_path: Path
 ) -> None:
@@ -29,7 +43,7 @@ def test_a_fresh_database_is_not_migrated_and_asking_does_not_create_it(
 
 
 def test_upgrade_creates_app_meta_with_an_install_id(settings: Settings, migrated_engine: Engine) -> None:
-    assert migrate.current(settings) == "0003_audit_events" == migrate.head(settings)
+    assert migrate.current(settings) == "0004_audit_pagination_index" == migrate.head(settings)
     assert {"app_meta", "alembic_version"} <= _tables(migrated_engine)
     with Session(migrated_engine) as session:
         install_id = session.scalars(select(AppMeta.value).where(AppMeta.key == INSTALL_ID_KEY)).one()
@@ -53,6 +67,34 @@ def test_upgrade_then_downgrade_then_upgrade(settings: Settings, migrated_engine
     migrate.upgrade(settings)
     assert migrate.current(settings) == migrate.head(settings)
     assert "app_meta" in _tables(migrated_engine)
+
+
+def test_a_database_at_0003_upgrades_to_0004_and_stays_append_only(settings: Settings) -> None:
+    migrate.upgrade(settings, "0003_audit_events")
+    engine = make_engine(settings)
+    try:
+        with engine.begin() as connection:
+            connection.execute(
+                text(
+                    "INSERT INTO audit_events (id, occurred_at, actor_display, action, entity_type, "
+                    "entity_id, details) VALUES ('e1', '2026-01-01 00:00:00', 'x', 'thing.changed', "
+                    "'thing', 't-1', '{}')"
+                )
+            )
+        migrate.upgrade(settings)
+        assert migrate.current(settings) == "0004_audit_pagination_index"
+        indexes = {ix["name"]: ix["column_names"] for ix in inspect(engine).get_indexes("audit_events")}
+        assert indexes["ix_audit_events_occurred_at_id"] == ["occurred_at", "id"]
+        assert "ix_audit_events_occurred_at" not in indexes
+        for statement in ("UPDATE audit_events SET action = 'x'", "DELETE FROM audit_events"):
+            with engine.begin() as connection, pytest.raises(DBAPIError, match="append-only"):
+                connection.execute(text(statement))
+        with engine.connect() as connection:
+            assert connection.execute(text("SELECT action FROM audit_events")).scalars().all() == [
+                "thing.changed"
+            ]
+    finally:
+        engine.dispose()
 
 
 def test_models_and_migrations_agree(migrated_engine: Engine) -> None:

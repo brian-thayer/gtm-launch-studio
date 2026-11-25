@@ -6,6 +6,7 @@ from fastapi import Depends, HTTPException, Request, status
 
 from gtm_studio.auth.oidc import OidcAuthProvider
 from gtm_studio.db.deps import get_session as get_session  # re-export: routers import deps from here
+from gtm_studio.db.deps import get_uow_factory
 from gtm_studio.services.activity import ActivityService
 from gtm_studio.services.ports import UnitOfWorkFactory
 from gtm_studio.settings import Settings
@@ -18,12 +19,9 @@ def get_settings(request: Request) -> Settings:
     return settings
 
 
-def get_activity_service(request: Request) -> ActivityService:
-    uow_factory: UnitOfWorkFactory | None = getattr(request.app.state, "uow_factory", None)
-    if uow_factory is None:
-        raise RuntimeError(
-            "no unit of work factory: the app lifespan did not run (use `with TestClient(app)`)"
-        )
+def get_activity_service(
+    uow_factory: Annotated[UnitOfWorkFactory, Depends(get_uow_factory)],
+) -> ActivityService:
     return ActivityService(uow_factory)
 
 

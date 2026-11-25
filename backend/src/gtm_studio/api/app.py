@@ -21,6 +21,7 @@ from fastapi.routing import APIRoute
 from starlette.middleware.sessions import SessionMiddleware
 
 from gtm_studio import __version__
+from gtm_studio.api.errors import register_exception_handlers
 from gtm_studio.api.routes import activity, auth, health
 from gtm_studio.audit.logging import configure_logging
 from gtm_studio.audit.middleware import REQUEST_ID_HEADER, RequestContextMiddleware
@@ -112,6 +113,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             expose_headers=[REQUEST_ID_HEADER],  # so the frontend can show it in an error message
         )
     app.add_middleware(RequestContextMiddleware)
+    register_exception_handlers(app)  # domain errors -> 404/409/422/403 (adds no routes)
     app.include_router(health.router, prefix=API_PREFIX)
     app.include_router(auth.router, prefix=API_PREFIX)
     app.include_router(activity.router, prefix=API_PREFIX)

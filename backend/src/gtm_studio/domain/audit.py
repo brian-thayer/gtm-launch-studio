@@ -13,6 +13,8 @@ from datetime import datetime
 from enum import StrEnum
 from typing import Any
 
+from gtm_studio.domain.errors import InvalidInputError
+
 SYSTEM_ACTOR_DISPLAY = "system"
 """``actor_display`` when no signed-in person caused the event: a background job, or a failed sign-in."""
 
@@ -24,11 +26,15 @@ class AuditAction(StrEnum):
 
     AUTH_LOGIN = "auth.login"
     AUTH_LOGOUT = "auth.logout"
-    AUTH_LOGIN_DENIED = "auth.login_denied"  # an unknown or inactive user tried to sign in (no actor)
-    # Written by the identity provider's sign-in (no actor: nobody is signed in yet; the entity is the user).
+    # Someone named an existing user who may not sign in, e.g. an inactive one (no actor). A sign-in that
+    # names nobody is only logged: the endpoints are open, and this table can't be pruned (ADR-0006).
+    AUTH_LOGIN_DENIED = "auth.login_denied"
+    # Written by the identity provider's sign-in or `gtm seed dev-users` (no actor; the entity is the user).
     USER_PROVISIONED = "user.provisioned"  # first sign-in through OIDC created the user
-    USER_UPDATED = "user.updated"  # the IdP reported a new email or display name
+    USER_UPDATED = "user.updated"  # the IdP or the seed file changed the user's profile
     USER_ROLES_SYNCED = "user.roles_synced"  # the IdP's groups changed the user's role grants
+    USER_SEEDED = "user.seeded"  # `gtm seed dev-users` created the user
+    USER_ROLES_SET = "user.roles_set"  # `gtm seed dev-users` changed the user's role grants
 
 
 def canonical_hash(obj: Any) -> str:
@@ -73,8 +79,11 @@ class AuditFilters:
     action_prefix: str | None = None
 
 
-class InvalidCursorError(ValueError):
-    """The cursor is not one this API issued."""
+class InvalidCursorError(InvalidInputError):
+    """The cursor is not one this API issued (422)."""
+
+    def __init__(self, detail: str = "invalid cursor") -> None:
+        super().__init__(detail)
 
 
 def encode_cursor(occurred_at: datetime, event_id: str) -> str:

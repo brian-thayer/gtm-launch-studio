@@ -1,7 +1,7 @@
 """FastAPI dependencies that turn a session cookie into an ``Actor`` and check permissions.
 
-``auth`` may not import ``api`` (the layers contract), so this reads what it needs from ``app.state``
-directly instead of using ``api.deps``.
+``auth`` may not import ``api`` (the layers contract), so the identity service is built on
+``db.deps.get_uow_factory`` here instead of in ``api.deps``.
 
 Every route except health, the login options and dev login must depend on ``current_actor`` (directly or
 through ``require``); ``tests/api/test_auth.py`` enumerates the routes and fails when one doesn't.
@@ -14,17 +14,15 @@ from fastapi import Depends, HTTPException, Request, status
 
 from gtm_studio.audit.context import bind_actor
 from gtm_studio.auth.session import end_session, session_user_id
+from gtm_studio.db.deps import get_uow_factory
 from gtm_studio.domain.identity import Actor, Permission
 from gtm_studio.services.identity import IdentityService
 from gtm_studio.services.ports import UnitOfWorkFactory
 
 
-def get_identity_service(request: Request) -> IdentityService:
-    uow_factory: UnitOfWorkFactory | None = getattr(request.app.state, "uow_factory", None)
-    if uow_factory is None:
-        raise RuntimeError(
-            "no unit of work factory: the app lifespan did not run (use `with TestClient(app)`)"
-        )
+def get_identity_service(
+    uow_factory: Annotated[UnitOfWorkFactory, Depends(get_uow_factory)],
+) -> IdentityService:
     return IdentityService(uow_factory)
 
 

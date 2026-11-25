@@ -139,4 +139,5 @@ forbidden_modules = [
     "joserfc",
     "httpx",
     "httpx2",
+    "yaml",
 ]

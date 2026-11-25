@@ -20,6 +20,8 @@ def test_the_action_names_are_dotted_and_stable() -> None:
         "user.provisioned",
         "user.updated",
         "user.roles_synced",
+        "user.seeded",
+        "user.roles_set",
     ]
     assert all("." in a.value and a.value == a.value.lower() for a in AuditAction)
     assert AuditAction.AUTH_LOGIN == "auth.login"  # a plain string wherever one is expected

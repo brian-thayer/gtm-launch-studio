@@ -12,6 +12,7 @@ from gtm_studio.db.models.audit import AuditEvent
 from gtm_studio.domain.audit import (
     SYSTEM_ACTOR_DISPLAY,
     AuditAction,
+    AuditEventView,
     AuditFilters,
     InvalidCursorError,
     canonical_hash,
@@ -23,6 +24,7 @@ from gtm_studio.services.ports import UnitOfWorkFactory
 
 PMM_ID = "00000000-0000-4000-8000-000000000003"
 NO_FILTERS = AuditFilters()
+SEED_ACTIONS = (AuditAction.USER_SEEDED, AuditAction.USER_ROLES_SET)  # what the `seeded` fixture writes
 
 
 def _pmm(uow_factory: UnitOfWorkFactory) -> Actor:
@@ -32,8 +34,16 @@ def _pmm(uow_factory: UnitOfWorkFactory) -> Actor:
 
 
 def _count(engine: Engine) -> int:
+    """How many events there are, apart from the ones seeding wrote."""
     with Session(engine) as session:
-        return session.scalar(select(func.count()).select_from(AuditEvent)) or 0
+        query = select(func.count()).select_from(AuditEvent).where(AuditEvent.action.not_in(SEED_ACTIONS))
+        return session.scalar(query) or 0
+
+
+def _events(uow_factory: UnitOfWorkFactory) -> list[AuditEventView]:
+    """Every event, newest first, apart from the ones seeding wrote."""
+    items = ActivityService(uow_factory).list_events(NO_FILTERS, limit=100).items
+    return [e for e in items if e.action not in SEED_ACTIONS]
 
 
 def _stored(engine: Engine) -> list[AuditEvent]:
@@ -59,7 +69,7 @@ def test_an_event_is_written_with_the_request_context(
     finally:
         reset_request_context(token)
 
-    [event] = ActivityService(uow_factory).list_events(NO_FILTERS).items
+    [event] = _events(uow_factory)
     assert (event.actor_user_id, event.actor_display) == (PMM_ID, "Priya Marketing")
     assert (event.action, event.entity_type, event.entity_id) == ("thing.changed", "thing", "t-1")
     assert (event.request_id, event.ip, event.user_agent) == ("req-12345678", "203.0.113.9", "agent/1")
@@ -71,7 +81,7 @@ def test_an_event_is_written_with_the_request_context(
 def test_outside_a_request_the_request_fields_are_empty(uow_factory: UnitOfWorkFactory) -> None:
     with uow_factory() as uow:
         uow.audit.record(None, AuditAction.AUTH_LOGIN_DENIED, "user", "u-1")
-    [event] = ActivityService(uow_factory).list_events(NO_FILTERS).items
+    [event] = _events(uow_factory)
     assert (event.request_id, event.ip, event.user_agent) == (None, None, None)
     assert (event.action, event.details) == ("auth.login_denied", {})  # the enum is stored as its string
 
@@ -79,7 +89,7 @@ def test_outside_a_request_the_request_fields_are_empty(uow_factory: UnitOfWorkF
 def test_no_actor_means_a_system_event(uow_factory: UnitOfWorkFactory) -> None:
     with uow_factory() as uow:
         uow.audit.record(None, "job.finished", "job", "j-1")
-    [event] = ActivityService(uow_factory).list_events(NO_FILTERS).items
+    [event] = _events(uow_factory)
     assert (event.actor_user_id, event.actor_display) == (None, SYSTEM_ACTOR_DISPLAY)
 
 
@@ -88,7 +98,7 @@ def test_before_and_after_are_stored_as_canonical_hashes(uow_factory: UnitOfWork
         uow.audit.record(
             None, "thing.changed", "thing", "t-1", before={"b": 1, "a": [1, 2]}, after={"state": "approved"}
         )
-    [event] = ActivityService(uow_factory).list_events(NO_FILTERS).items
+    [event] = _events(uow_factory)
     assert event.before_hash == canonical_hash({"a": [1, 2], "b": 1})  # key order is irrelevant
     assert event.after_hash == canonical_hash({"state": "approved"})
     assert event.before_hash != event.after_hash
@@ -173,7 +183,7 @@ def test_the_table_has_the_expected_indexes(migrated_engine: Engine) -> None:
     indexes = {ix["name"]: ix["column_names"] for ix in inspect(migrated_engine).get_indexes("audit_events")}
     assert indexes == {
         "ix_audit_events_entity_type_entity_id": ["entity_type", "entity_id"],
-        "ix_audit_events_occurred_at": ["occurred_at"],
+        "ix_audit_events_occurred_at_id": ["occurred_at", "id"],
         "ix_audit_events_actor_user_id": ["actor_user_id"],
     }
 
@@ -348,25 +358,25 @@ def test_login_writes_one_event_with_the_provider(
     uow_factory: UnitOfWorkFactory, seeded: SeedSummary
 ) -> None:
     IdentityService(uow_factory).record_login(_pmm(uow_factory), "dev")
-    [event] = ActivityService(uow_factory).list_events(NO_FILTERS).items
+    [event] = _events(uow_factory)
     assert (event.action, event.entity_type, event.entity_id) == ("auth.login", "user", PMM_ID)
     assert (event.actor_user_id, event.details) == (PMM_ID, {"provider": "dev"})
 
 
 def test_logout_writes_one_event(uow_factory: UnitOfWorkFactory, seeded: SeedSummary) -> None:
     IdentityService(uow_factory).record_logout(_pmm(uow_factory))
-    [event] = ActivityService(uow_factory).list_events(NO_FILTERS).items
+    [event] = _events(uow_factory)
     assert (event.action, event.actor_user_id, event.entity_id) == ("auth.logout", PMM_ID, PMM_ID)
 
 
 def test_a_denied_login_has_no_actor_and_names_the_user_tried(
     uow_factory: UnitOfWorkFactory, seeded: SeedSummary
 ) -> None:
-    IdentityService(uow_factory).record_login_denied("not-a-user", "dev")
-    [event] = ActivityService(uow_factory).list_events(NO_FILTERS).items
+    IdentityService(uow_factory).record_login_denied(PMM_ID, "dev")  # an existing user (inactive, say)
+    [event] = _events(uow_factory)
     assert (event.action, event.actor_user_id, event.actor_display) == (
         "auth.login_denied",
         None,
         SYSTEM_ACTOR_DISPLAY,
     )
-    assert (event.entity_type, event.entity_id, event.details) == ("user", "not-a-user", {"provider": "dev"})
+    assert (event.entity_type, event.entity_id, event.details) == ("user", PMM_ID, {"provider": "dev"})

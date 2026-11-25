@@ -25,7 +25,7 @@ from starlette.concurrency import run_in_threadpool
 from starlette.requests import Request
 from starlette.responses import RedirectResponse
 
-from gtm_studio.domain.identity import ROLE_KEY, Actor, OidcRoleMap
+from gtm_studio.domain.identity import Actor, OidcRoleMap, check_role_key
 from gtm_studio.services.identity import IdentityService, UserConflictError
 from gtm_studio.settings import Settings
 
@@ -124,8 +124,7 @@ class _RoleMapFile(BaseModel):
 
 def _check_role_keys(keys: list[str]) -> None:
     for key in keys:
-        if not ROLE_KEY.fullmatch(key):
-            raise ValueError(f"role key {key!r} must be lowercase letters, digits and underscores")
+        check_role_key(key)
 
 
 def load_role_map(path: Path) -> OidcRoleMap:

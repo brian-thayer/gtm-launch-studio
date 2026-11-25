@@ -3,6 +3,7 @@
 import json
 import logging
 import os
+import shutil
 from collections.abc import Callable, Iterator
 from functools import partial
 from pathlib import Path
@@ -14,17 +15,25 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from pydantic import SecretStr
 from sqlalchemy import Engine
+from sqlalchemy.engine import make_url
 from sqlalchemy.orm import Session
 
 from gtm_studio.api.app import create_app
 from gtm_studio.api.introspection import RouteInfo, list_routes
 from gtm_studio.audit.logging import QUIET_LIBRARIES, StderrHandler, configure_logging
-from gtm_studio.db.engine import make_engine, make_session_factory
+from gtm_studio.auth.dev_users import load_dev_users
+from gtm_studio.db.engine import make_engine, make_session_factory, sqlite_file
 from gtm_studio.db.migrate import upgrade
 from gtm_studio.db.uow import SqlUnitOfWork
 from gtm_studio.services.identity import IdentityService, SeedSummary
 from gtm_studio.services.ports import UnitOfWorkFactory
 from gtm_studio.settings import REPO_ROOT, Settings
+
+
+def _ignore_the_machine(monkeypatch: pytest.MonkeyPatch) -> None:
+    for name in [n for n in os.environ if n.startswith("GTM_")]:
+        monkeypatch.delenv(name)
+    monkeypatch.setitem(Settings.model_config, "env_file", None)
 
 
 @pytest.fixture(autouse=True)
@@ -34,9 +43,7 @@ def _isolate_settings_from_machine(monkeypatch: pytest.MonkeyPatch) -> None:
     Removes the GTM_* variables and turns off the .env file at the class level. (Not ``_env_file=None``
     per call: pyright drops pydantic-settings' underscore keyword arguments.)
     """
-    for name in [n for n in os.environ if n.startswith("GTM_")]:
-        monkeypatch.delenv(name)
-    monkeypatch.setitem(Settings.model_config, "env_file", None)
+    _ignore_the_machine(monkeypatch)
 
 
 _SERVER_LOGGERS = ("uvicorn", "uvicorn.error", "uvicorn.access")
@@ -136,10 +143,27 @@ def api_routes(settings: Settings) -> list[RouteInfo]:
     return list_routes(create_app(settings))
 
 
+@pytest.fixture(scope="session")
+def _migrated_template(tmp_path_factory: pytest.TempPathFactory) -> Path:
+    """One SQLite file migrated to head, once per test run. ``migrated_engine`` hands each test a copy:
+    copying a file is far cheaper than running every migration again."""
+    template = tmp_path_factory.mktemp("template") / "gtm_studio.db"
+    with pytest.MonkeyPatch.context() as monkeypatch:  # session-scoped: the autouse fixture isn't active
+        _ignore_the_machine(monkeypatch)
+        upgrade(Settings(env="test", db_url=f"sqlite:///{template.as_posix()}"))
+    # Alembic disposes its engine, so SQLite has checkpointed the WAL into the file and removed it.
+    assert not template.with_name(f"{template.name}-wal").exists()
+    return template
+
+
 @pytest.fixture
-def migrated_engine(settings: Settings) -> Iterator[Engine]:
-    """An engine on a fresh database (in tmp_path, so one per test) migrated to head by Alembic."""
-    upgrade(settings)
+def migrated_engine(settings: Settings, _migrated_template: Path) -> Iterator[Engine]:
+    """An engine on a fresh database at ``settings.db_url`` (in tmp_path, so one per test), migrated to
+    head: a copy of the session's template. Tests of Alembic itself run the migrations instead
+    (``tests/service/test_migrations.py`` overrides this fixture)."""
+    db_file = sqlite_file(make_url(settings.db_url))
+    assert db_file is not None
+    shutil.copyfile(_migrated_template, db_file)
     engine = make_engine(settings)
     try:
         yield engine
@@ -171,7 +195,8 @@ def uow_factory(migrated_engine: Engine) -> UnitOfWorkFactory:
 @pytest.fixture
 def seeded(uow_factory: UnitOfWorkFactory) -> SeedSummary:
     """The migrated database with the demo users from ``config/dev_users.yaml`` in it."""
-    return IdentityService(uow_factory).seed_dev_users(REPO_ROOT / "config" / "dev_users.yaml")
+    seeds = load_dev_users(REPO_ROOT / "config" / "dev_users.yaml")
+    return IdentityService(uow_factory).seed_dev_users(seeds)
 
 
 @pytest.fixture

@@ -54,7 +54,7 @@ class SqlIdentityRepository:
 
     def set_roles(
         self, user_id: str, role_keys: Collection[str], *, source: RoleSource, granted_by: str | None = None
-    ) -> None:
+    ) -> tuple[frozenset[str], frozenset[str]]:
         wanted = set(role_keys)
         held = set(self._session.scalars(select(UserRole.role_key).where(UserRole.user_id == user_id)))
         if held - wanted:
@@ -66,6 +66,7 @@ class SqlIdentityRepository:
                 UserRole(user_id=user_id, role_key=key, granted_by_user_id=granted_by, source=source)
             )
         self._session.flush()
+        return frozenset(wanted - held), frozenset(held - wanted)
 
     def sync_source_roles(
         self, user_id: str, role_keys: Collection[str], *, source: RoleSource

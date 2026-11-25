@@ -38,9 +38,9 @@ class IdentityRepository(Protocol):
 
     def set_roles(
         self, user_id: str, role_keys: Collection[str], *, source: RoleSource, granted_by: str | None = None
-    ) -> None:
+    ) -> tuple[frozenset[str], frozenset[str]]:
         """Make the user hold exactly these roles. Every role must exist. Grants that stay keep their
-        original ``granted_at``."""
+        original ``granted_at``. Returns ``(added, removed)``."""
         ...
 
     def sync_source_roles(

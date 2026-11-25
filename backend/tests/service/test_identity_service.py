@@ -8,14 +8,18 @@ from sqlalchemy import Engine, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from gtm_studio.auth.dev_users import load_dev_users
 from gtm_studio.db.models.identity import Role, User, UserRole
+from gtm_studio.domain.audit import SYSTEM_ACTOR_DISPLAY, AuditFilters
 from gtm_studio.domain.identity import UserRecord
+from gtm_studio.services.activity import ActivityService
 from gtm_studio.services.identity import IdentityService, SeedError, SeedSummary
 from gtm_studio.services.ports import UnitOfWorkFactory
 from gtm_studio.settings import REPO_ROOT
 
 ADMIN_ID = "00000000-0000-4000-8000-000000000001"
 PMM_ID = "00000000-0000-4000-8000-000000000003"
+DEV_USERS = REPO_ROOT / "config" / "dev_users.yaml"
 
 
 def _write(path: Path, users: list[dict[str, object]]) -> Path:
@@ -67,7 +71,7 @@ def test_seeded_roles_are_marked_dev_seed(migrated_engine: Engine, seeded: SeedS
 
 
 def test_seeding_twice_changes_nothing(uow_factory: UnitOfWorkFactory, seeded: SeedSummary) -> None:
-    again = IdentityService(uow_factory).seed_dev_users(REPO_ROOT / "config" / "dev_users.yaml")
+    again = IdentityService(uow_factory).seed_dev_users(load_dev_users(DEV_USERS))
     assert again == SeedSummary(users_created=0, users_updated=0, users_unchanged=5, roles_created=0)
 
 
@@ -79,10 +83,10 @@ def test_seeding_updates_a_changed_user_and_leaves_others_alone(
         tmp_path / "users.yaml",
         [_user(), _user(id="22222222-2222-4222-8222-222222222222", email="y@example.test")],
     )
-    assert service.seed_dev_users(path).users_created == 2
+    assert service.seed_dev_users(load_dev_users(path)).users_created == 2
 
     _write(path, [_user(display_name="Zed Renamed", roles=["zed_role", "other"])])
-    summary = service.seed_dev_users(path)
+    summary = service.seed_dev_users(load_dev_users(path))
     assert (summary.users_created, summary.users_updated, summary.users_unchanged) == (0, 1, 0)
     assert summary.roles_created == 1
 
@@ -94,7 +98,7 @@ def test_seeding_updates_a_changed_user_and_leaves_others_alone(
 
 def test_seeding_lowercases_the_email(uow_factory: UnitOfWorkFactory, tmp_path: Path) -> None:
     service = IdentityService(uow_factory)
-    service.seed_dev_users(_write(tmp_path / "users.yaml", [_user()]))
+    service.seed_dev_users(load_dev_users(_write(tmp_path / "users.yaml", [_user()])))
     with uow_factory() as uow:
         user = uow.identity.get_user_by_email("ZED@example.TEST")
     assert user is not None
@@ -112,14 +116,10 @@ def test_seeding_lowercases_the_email(uow_factory: UnitOfWorkFactory, tmp_path: 
         {"unexpected": "field"},
     ],
 )
-def test_a_malformed_seed_file_is_rejected_before_anything_is_written(
-    uow_factory: UnitOfWorkFactory, tmp_path: Path, bad: dict[str, object]
-) -> None:
-    service = IdentityService(uow_factory)
+def test_a_malformed_seed_file_is_rejected_by_the_loader(tmp_path: Path, bad: dict[str, object]) -> None:
     path = _write(tmp_path / "users.yaml", [_user(id="33333333-3333-4333-8333-333333333333"), _user(**bad)])
     with pytest.raises(SeedError, match=r"users.yaml"):
-        service.seed_dev_users(path)
-    assert service.list_active_users() == []
+        load_dev_users(path)
 
 
 def test_an_inactive_user_gives_no_actor(uow_factory: UnitOfWorkFactory, seeded: SeedSummary) -> None:
@@ -213,16 +213,79 @@ def test_a_seed_email_that_belongs_to_another_user_is_a_clear_error(
 ) -> None:
     path = _write(tmp_path / "users.yaml", [_user(email="avery.admin@example.test")])
     with pytest.raises(SeedError, match="already belongs to a different user"):
-        IdentityService(uow_factory).seed_dev_users(path)
+        IdentityService(uow_factory).seed_dev_users(load_dev_users(path))
 
 
-def test_a_missing_or_unparsable_seed_file_is_a_seed_error(
-    uow_factory: UnitOfWorkFactory, tmp_path: Path
-) -> None:
-    service = IdentityService(uow_factory)
+def test_a_missing_or_unparsable_seed_file_is_a_seed_error(tmp_path: Path) -> None:
     with pytest.raises(SeedError):
-        service.seed_dev_users(tmp_path / "nope.yaml")
+        load_dev_users(tmp_path / "nope.yaml")
     broken = tmp_path / "broken.yaml"
     broken.write_text("users: [unclosed", encoding="utf-8")
     with pytest.raises(SeedError):
-        service.seed_dev_users(broken)
+        load_dev_users(broken)
+
+
+# ------------------------------------------------------------------ seeding is audited (ADR-0006)
+
+
+def _seed_events(uow_factory: UnitOfWorkFactory) -> list[tuple[str, str, dict[str, object]]]:
+    """(action, entity_id, details) of every event, oldest first, after checking each has no actor."""
+    events = ActivityService(uow_factory).list_events(AuditFilters(), limit=100).items
+    assert {(e.actor_user_id, e.actor_display) for e in events} <= {(None, SYSTEM_ACTOR_DISPLAY)}
+    return [(e.action, e.entity_id, e.details) for e in reversed(events)]
+
+
+def test_seeding_a_fresh_database_audits_each_user_and_their_roles(
+    uow_factory: UnitOfWorkFactory, seeded: SeedSummary
+) -> None:
+    events = _seed_events(uow_factory)
+    seeded_ids = [entity for action, entity, _ in events if action == "user.seeded"]
+    assert len(seeded_ids) == 5
+    assert {details["provider"] for action, _, details in events if action == "user.seeded"} == {"dev"}
+    roles_set = {entity: details for action, entity, details in events if action == "user.roles_set"}
+    assert set(roles_set) == set(seeded_ids)
+    assert roles_set[ADMIN_ID] == {"added": ["admin"], "removed": []}
+    assert {action for action, _, _ in events} == {"user.seeded", "user.roles_set"}
+
+
+def test_seeding_again_unchanged_audits_nothing(uow_factory: UnitOfWorkFactory, seeded: SeedSummary) -> None:
+    before = len(_seed_events(uow_factory))
+    IdentityService(uow_factory).seed_dev_users(load_dev_users(DEV_USERS))
+    assert len(_seed_events(uow_factory)) == before
+
+
+def test_seeding_a_changed_user_audits_the_change(uow_factory: UnitOfWorkFactory, tmp_path: Path) -> None:
+    service = IdentityService(uow_factory)
+    path = _write(tmp_path / "users.yaml", [_user()])
+    service.seed_dev_users(load_dev_users(path))
+    first = len(_seed_events(uow_factory))
+
+    _write(path, [_user(display_name="Zed Renamed", roles=["other"])])
+    service.seed_dev_users(load_dev_users(path))
+    zed = "11111111-1111-4111-8111-111111111111"
+    assert _seed_events(uow_factory)[first:] == [
+        ("user.updated", zed, {"provider": "dev", "fields": ["display_name"]}),
+        ("user.roles_set", zed, {"added": ["other"], "removed": ["zed_role"]}),
+    ]
+
+
+def test_a_failed_seed_writes_no_events(
+    uow_factory: UnitOfWorkFactory, seeded: SeedSummary, tmp_path: Path
+) -> None:
+    before = len(_seed_events(uow_factory))
+    seeds = load_dev_users(
+        _write(tmp_path / "users.yaml", [_user(), _user(id=PMM_ID, email="avery.admin@example.test")])
+    )
+    with pytest.raises(SeedError):
+        IdentityService(uow_factory).seed_dev_users(seeds)
+    assert len(_seed_events(uow_factory)) == before  # the first user's events rolled back with it
+
+
+def test_user_exists_sees_inactive_users_too(uow_factory: UnitOfWorkFactory, seeded: SeedSummary) -> None:
+    service = IdentityService(uow_factory)
+    with uow_factory() as uow:
+        record = uow.identity.get_user(PMM_ID)
+        assert record is not None
+        uow.identity.upsert_user(replace(record, is_active=False))
+    assert service.user_exists(PMM_ID)
+    assert not service.user_exists("99999999-9999-4999-8999-999999999999")

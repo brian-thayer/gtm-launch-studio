@@ -44,11 +44,17 @@ def dev_login(
 ) -> Me:
     """Sign in as a seeded user. 404 for an unknown or inactive user, and whenever the provider isn't dev.
     Both outcomes are audited (`auth.login`, `auth.login_denied`)."""
+    # (The docstring is the published OpenAPI description, so S10a left it as it was.) Only a denial
+    # for a user who exists is audited. An ID that names nobody is logged only, because the endpoint is
+    # open and audit rows can't be deleted (ADR-0006).
     if settings.auth_provider != "dev":
         raise _not_found()
     actor = DevAuthProvider(identity).authenticate(body.user_id)
     if actor is None:
-        identity.record_login_denied(body.user_id, "dev")
+        if identity.user_exists(body.user_id):
+            identity.record_login_denied(body.user_id, "dev", reason="inactive")
+        else:
+            log.warning("dev sign-in denied", reason="unknown_user")
         raise _not_found()
     identity.record_login(actor, "dev")
     bind_actor(actor.id)  # this request is now the actor's, for the access log

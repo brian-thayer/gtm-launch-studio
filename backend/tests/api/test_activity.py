@@ -14,6 +14,7 @@ PMM_ID = "00000000-0000-4000-8000-000000000003"
 MISSING_ID = "99999999-9999-4999-8999-999999999999"
 
 LoginAs = Callable[..., TestClient]
+StderrLogs = Callable[[], list[dict[str, Any]]]
 
 
 def _activity(client: TestClient, path: str = "/api/activity", **params: Any) -> dict[str, Any]:
@@ -53,18 +54,26 @@ def test_a_login_creates_an_event_with_the_request_details(app: FastAPI, login_a
     assert event["occurred_at"].endswith(("Z", "+00:00"))
 
 
-def test_logout_and_a_denied_login_are_audited(app: FastAPI, login_as: LoginAs) -> None:
+def test_a_logout_is_audited(login_as: LoginAs) -> None:
     pmm = login_as("pmm")
     assert pmm.post("/api/auth/logout", headers=CSRF).status_code == 204
+    [event] = _activity(login_as("admin"), action_prefix="auth.logout")["items"]
+    assert (event["actor_user_id"], event["entity_id"], event["ip"]) == (PMM_ID, PMM_ID, "testclient")
+
+
+def test_a_login_as_nobody_is_logged_and_not_audited(
+    app: FastAPI, login_as: LoginAs, stderr_logs: StderrLogs
+) -> None:
+    """ADR-0006: the endpoint is open, so an ID that names no user must not grow the append-only table."""
+    admin = login_as("admin")
+    stderr_logs()  # drop what logging in wrote
     denied = TestClient(app).post("/api/auth/dev/login", json={"user_id": MISSING_ID}, headers=CSRF)
     assert denied.status_code == 404
 
-    events = _activity(login_as("admin"), action_prefix="auth.")["items"]
-    by_action = {e["action"]: e for e in events if e["action"] != "auth.login"}
-    assert by_action["auth.logout"]["actor_user_id"] == PMM_ID
-    assert by_action["auth.login_denied"]["actor_user_id"] is None
-    assert by_action["auth.login_denied"]["entity_id"] == MISSING_ID
-    assert by_action["auth.login_denied"]["ip"] == "testclient"
+    [warning] = [line for line in stderr_logs() if line["level"] == "warning"]
+    assert (warning["event"], warning["reason"]) == ("dev sign-in denied", "unknown_user")
+    assert MISSING_ID not in str(warning)
+    assert _activity(admin, action_prefix="auth.login_denied")["items"] == []
 
 
 def test_an_inactive_users_login_is_denied_and_audited(
@@ -79,7 +88,9 @@ def test_an_inactive_users_login_is_denied_and_audited(
     )
 
     events = _activity(login_as("admin"), action_prefix="auth.login_denied")["items"]
-    assert [(e["entity_id"], e["actor_user_id"]) for e in events] == [(PMM_ID, None)]
+    assert [(e["entity_id"], e["actor_user_id"], e["details"]) for e in events] == [
+        (PMM_ID, None, {"provider": "dev", "reason": "inactive"})
+    ]
 
 
 def test_a_login_that_does_not_happen_leaves_no_login_event(app: FastAPI, login_as: LoginAs) -> None:

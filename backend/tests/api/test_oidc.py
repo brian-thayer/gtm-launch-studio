@@ -29,7 +29,7 @@ from structlog.testing import capture_logs
 from gtm_studio.api.app import create_app
 from gtm_studio.auth.oidc import RoleMapError
 from gtm_studio.db.models.identity import Role
-from gtm_studio.domain.audit import AuditEventView, AuditFilters
+from gtm_studio.domain.audit import AuditAction, AuditEventView, AuditFilters
 from gtm_studio.services.identity import SeedSummary
 from gtm_studio.services.ports import UnitOfWorkFactory
 from gtm_studio.settings import Settings
@@ -128,9 +128,10 @@ def browser(oidc_settings: Settings, seeded: SeedSummary, idp: FakeIdp) -> Itera
 
 
 def _events(uow_factory: UnitOfWorkFactory) -> list[AuditEventView]:
-    """Every audit event, oldest first."""
+    """Every audit event, oldest first, apart from the ones seeding wrote."""
     with uow_factory() as uow:
-        return list(reversed(uow.audit.query(AuditFilters(), None, 100).items))
+        items = reversed(uow.audit.query(AuditFilters(), None, 100).items)
+    return [e for e in items if e.action not in (AuditAction.USER_SEEDED, AuditAction.USER_ROLES_SET)]
 
 
 def _roles(browser: TestClient) -> list[str]:

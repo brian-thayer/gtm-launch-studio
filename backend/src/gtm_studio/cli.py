@@ -11,6 +11,7 @@ from gtm_studio import __version__
 from gtm_studio.api.app import create_app
 from gtm_studio.api.openapi import render_openapi
 from gtm_studio.audit.logging import configure_logging
+from gtm_studio.auth.dev_users import load_dev_users
 from gtm_studio.db import migrate
 from gtm_studio.db.engine import make_engine, make_session_factory
 from gtm_studio.db.uow import SqlUnitOfWork
@@ -105,7 +106,7 @@ def seed_dev_users(
     engine = make_engine(settings)
     try:
         uow_factory: UnitOfWorkFactory = partial(SqlUnitOfWork, make_session_factory(engine))
-        summary = IdentityService(uow_factory).seed_dev_users(source)
+        summary = IdentityService(uow_factory).seed_dev_users(load_dev_users(source))
     except SeedError as exc:
         typer.echo(f"seeding failed: {exc}", err=True)
         raise typer.Exit(1) from exc
