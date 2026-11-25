@@ -12,9 +12,11 @@ from gtm_studio.api.app import create_app
 from gtm_studio.api.openapi import render_openapi
 from gtm_studio.audit.logging import configure_logging
 from gtm_studio.auth.dev_users import load_dev_users
+from gtm_studio.catalog.loader import CatalogLoadError, catalog_present, load_catalog
 from gtm_studio.db import migrate
 from gtm_studio.db.engine import make_engine, make_session_factory
 from gtm_studio.db.uow import SqlUnitOfWork
+from gtm_studio.domain.catalog import Catalog
 from gtm_studio.services.identity import IdentityService, SeedError
 from gtm_studio.services.ports import UnitOfWorkFactory
 from gtm_studio.settings import Settings
@@ -25,6 +27,8 @@ db_app = typer.Typer(help="Database migrations.", no_args_is_help=True)
 app.add_typer(db_app, name="db")
 seed_app = typer.Typer(help="Load seed data.", no_args_is_help=True)
 app.add_typer(seed_app, name="seed")
+catalog_app = typer.Typer(help="The GTM catalog (gtm_catalog/).", no_args_is_help=True)
+app.add_typer(catalog_app, name="catalog")
 
 
 @app.callback()
@@ -116,6 +120,104 @@ def seed_dev_users(
         f"dev users: {summary.users_created} created, {summary.users_updated} updated, "
         f"{summary.users_unchanged} unchanged; roles: {summary.roles_created} created"
     )
+
+
+def _table(rows: list[list[str]]) -> list[str]:
+    """Rows as indented, column-aligned lines (all rows have the same number of cells)."""
+    if not rows:
+        return ["  none"]
+    widths = [max(len(row[i]) for row in rows) for i in range(len(rows[0]))]
+    return [
+        "  " + "  ".join(cell.ljust(w) for cell, w in zip(row, widths, strict=True)).rstrip() for row in rows
+    ]
+
+
+def _timing_text(catalog: Catalog, tier_key: str) -> str:
+    tier = catalog.tier(tier_key)
+    parts: list[str] = []
+    if tier.timing is not None:
+        parts.append(f"anchor {tier.timing.anchor}")
+        if tier.timing.plan_start_days is not None:
+            parts.append(f"plan start {tier.timing.plan_start_days:+d}d")
+        if tier.timing.core_due_days is not None:
+            parts.append(f"core due {tier.timing.core_due_days:+d}d")
+    text = f"timing: {', '.join(parts)}" if parts else ""
+    return "; ".join(p for p in (text, f"optional: {', '.join(tier.optional)}" if tier.optional else "") if p)
+
+
+def _render_catalog(catalog: Catalog) -> str:
+    """The text `gtm catalog show` prints."""
+    gates = catalog.gates_in_order()
+    tiers = catalog.tiers_by_rank()
+    inherits = "each also gets the core assets of the tiers below it" if catalog.tiers.inherits_lower else ""
+    matrix = catalog.matrix()
+    triggers = [
+        [
+            t.key,
+            t.context_key or "(a person decides)",
+            f"-> {', '.join(t.assets)}",
+            f"tiers: {', '.join(t.tiers)}" if t.tiers is not None else "every tier",
+        ]
+        for t in catalog.tiers.triggers
+    ]
+    undefined = sorted(catalog.undefined_asset_keys())
+    lines = [
+        f"version {catalog.version_hash}",
+        "",
+        "gates, in order",
+        *_table(
+            [
+                [
+                    str(g.order),
+                    g.key,
+                    g.label,
+                    f"approvers: {', '.join(g.approver_roles)}"
+                    + ("  [release gate]" if g.release_gate else ""),
+                ]
+                for g in gates
+            ]
+        ),
+        "",
+        f"tiers, by rank{f' ({inherits})' if inherits else ''}",
+        *_table([[str(t.rank), t.key, t.label, _timing_text(catalog, t.key)] for t in tiers]),
+        "",
+        "core assets by tier and gate",
+        *_table(
+            [
+                ["", *(g.key for g in gates)],
+                *([t.key, *(", ".join(matrix[t.key][g.key]) or "-" for g in gates)] for t in tiers),
+            ]
+        ),
+        "",
+        "triggers",
+        *(_table(triggers) if triggers else ["  none"]),
+        "",
+        "asset keys with no asset type folder",
+        *([f"  {', '.join(undefined)}"] if undefined else ["  none"]),
+    ]
+    return "\n".join(lines)
+
+
+@catalog_app.command("show")
+def catalog_show(
+    path: Annotated[
+        Path | None,
+        typer.Option(
+            "--path", help="Catalog folder, relative to the working directory. Default: GTM_CATALOG_DIR."
+        ),
+    ] = None,
+) -> None:
+    """Print a catalog's version hash, gates, tiers, tier x gate matrix, triggers and missing asset types."""
+    root = path if path is not None else Settings().catalog_dir
+    if not catalog_present(root):
+        typer.echo(f"no catalog at {root}", err=True)
+        raise typer.Exit(1)
+    try:
+        catalog = load_catalog(root)
+    except CatalogLoadError as exc:
+        typer.echo(str(exc), err=True)
+        raise typer.Exit(1) from exc
+    typer.echo(_render_catalog(catalog))
 
 
 @app.command()

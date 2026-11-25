@@ -222,3 +222,24 @@ Newest entries go at the bottom. Each step appends one entry: what was built, an
   - Suite time, before (S09, 337 tests): 16.98 s by pytest's count.
   - After (361 tests): a paired A/B on the same tests over four rounds, migrating per test against copying the template, gave medians of 23.5 s and 15.3 s, **35% faster** (26–43% per round). Plain runs took 11.87–16.7 s on a noisy machine.
 
+## S10 Catalog models, loader, version hash, `gtm catalog show` (2026-11-25, Sonnet)
+- Built:
+  - `domain/catalog.py`: frozen, `extra="forbid"` Pydantic models for the lifecycle (roles, gates, readiness categories), tiers (core, optional, timing, criteria), triggers, typed context keys, the brand and asset types (spec, prompt, rubric, gold examples), and the `Catalog` lookups: `gate`, `tier`, `asset_type` (`NotFoundError` when unknown), `approver_roles_for`, `core_assets` (with `inherits_lower`), `optional_assets`, `triggers_for`, `tier_decider`, `matrix` and `undefined_asset_keys`;
+  - `catalog/frontmatter.py` (`split_frontmatter`, `rubric_criteria`), `catalog/loader.py` (`load_catalog`, `catalog_present`, `loaded_files`, and `CatalogLoadError`, which names the file and flattens Pydantic's error locations) and `catalog/hashing.py` (`catalog_version_hash`: 12 hex characters over the loaded files, with `\r\n` read as `\n`);
+  - `gtm catalog show [--path P]`: the hash, gates with approver roles, tiers with timing and optional assets, the tier × gate matrix, triggers and asset keys with no folder. It exits 1 with `no catalog at <path>` or the failing file and message;
+  - `tests/fixtures/catalog_min/` (neutral names: 2 roles, 2 gates, 2 tiers, 1 trigger, 4 context keys, 5 asset types, each with a redacted gold example) and the `catalog_min_dir`, `catalog_min` and `catalog_min_copy` fixtures;
+  - README (`GTM_CATALOG_DIR` is repo-root-relative, `--path` is working-directory-relative) and `backend/CLAUDE.md` (layout, the `show` command, the fixtures).
+- Deviations (reasons in the card's Notes):
+  - duplicate context keys are a load error (a dict can't hold them), so S10b must test that rule, and the same for asset types, through the loader and not through `model_copy`;
+  - a function-level import in `load_catalog` breaks the `hashing` ↔ `loader` cycle;
+  - size: about 1,400 lines against about 500, mostly error-path and hashing tests.
+- Review: `code-reviewer` **PASS WITH NITS**, nothing blocking. Fixed: `_table([])` crashed on a catalog with no gates or tiers (now prints `none`, with a test); the examples glob is case-sensitive on every platform; the CRLF hash test now sets the line ends itself, since a Windows checkout already has CRLF.
+- Follow-ups:
+  - S15: `NotFoundError` messages repeat the key they were given, so map them or make them generic before an endpoint looks one up by path parameter;
+  - S10b: `count_todos` should use `loaded_files`; test the duplicate-key rule for context keys and asset types through the loader;
+  - possible: move `loaded_files` to its own module to drop the local import; refuse a `slug:` or `body_md:` key in a gold example's frontmatter.
+- Verification (from `backend/`):
+  - `uv run pytest` 436 passed (361 before, 75 new) in about 21 s · `ruff check` clean · `ruff format --check` 109 files formatted · `pyright` 0 errors · `lint-imports` 3 contracts kept;
+  - `uv run gtm catalog show --path tests/fixtures/catalog_min` exits 0 with the hash `4c76dcff74e9` and the 2 × 2 matrix (`tier_big`: `gate_one` [brief, classify], `gate_two` [deep_dive]; `tier_small`: `gate_one` [brief, classify], `gate_two` []);
+  - `grep -rn -i -E "gate_one|tier_big|brief|battlecard|vonage" src/gtm_studio` finds nothing.
+

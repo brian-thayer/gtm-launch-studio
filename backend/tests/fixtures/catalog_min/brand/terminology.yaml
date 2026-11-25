@@ -1,0 +1,5 @@
+product_names:
+  - { name: Widget, rules: Always capitalised., never: [Widgets Pro] }
+preferred:
+  - { use: customer, avoid: [client] }
+banned_external: [guaranteed]

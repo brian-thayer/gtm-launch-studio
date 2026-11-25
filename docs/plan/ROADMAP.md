@@ -32,7 +32,7 @@ Order: run the code steps first (S10a → S10 → S10b → S15 → S15b), becaus
 | Step | Title | Status | Depends on | Human |
 |---|---|---|---|---|
 | S10a | Backend conventions from the M1 review (errors, uow dependency, clock, role key, audited seeding, audit index, template test DB) | done | S09 | |
-| S10 | Catalog models (core / optional / triggers / timing), loader, version hash, `gtm catalog show`, `catalog_min` | todo | S10a | |
+| S10 | Catalog models (core / optional / triggers / timing), loader, version hash, `gtm catalog show`, `catalog_min` | done | S10a | |
 | S10b | Catalog validator, `gtm catalog validate`, demo catalog | todo | S10 | |
 | S15 | Catalog in the app: service, role sync, read API, admin reload, "no catalog" state | todo | S10b | |
 | S15b | Catalog page; login follow-ups (SSO `next`, error messages, server-error page, `safeNext` parity) | todo | S15 | approve `npm install react-markdown` |

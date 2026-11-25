@@ -1,6 +1,6 @@
 # S10: Catalog models, loader, version hash, `gtm catalog show`
 
-Status: todo
+Status: done
 Milestone: M2
 Depends on: S10a
 Human in the loop: no
@@ -177,3 +177,15 @@ uv run gtm catalog show --path tests/fixtures/catalog_min
 - The user's real catalog (S11–S14).
 
 ## Notes
+Deviations:
+- **Duplicate context keys are a load error, not a validator rule.** `Catalog.context_keys` is a dict, so a duplicate would vanish before `validate` ever saw it. The loader raises `CatalogLoadError` naming `context_keys.yaml`. **S10b:** its "duplicate keys" rule can't be tested with `model_copy` for context keys or asset types (both are dict-keyed; asset types by folder), so test those two through the loader (a `catalog_min_copy` with a doubled key) and keep the `model_copy` tests for roles, gates, tiers and triggers.
+- **A function-level import in `load_catalog`.** `hashing.py` imports `loaded_files` from `loader.py`, and `load_catalog` needs `catalog_version_hash`. I kept to the card's file list and broke the cycle with a local import (commented). If it bothers a reviewer, move `loaded_files` to its own module and re-export it from `loader`.
+- `Rubric.raw_md` is the rubric file **without** its frontmatter. `prompt_md` and the three brand Markdown files are the whole file.
+- Shared test fixtures added to `tests/conftest.py`: `catalog_min_dir` (the path), `catalog_min` (loaded) and `catalog_min_copy` (a writable copy). S10b, S15 and later tests should use them.
+- Size: about 1,400 lines against a budget of about 500: roughly 670 of source (about 100 of that is the `show` renderer in `cli.py`) and 735 of tests. The extra is error-path, frontmatter and hashing tests, not extra features.
+
+Follow-ups:
+- **S15:** `Catalog.gate / tier / asset_type` raise `NotFoundError(f"unknown gate {key!r}")`, which repeats the key it was given. `domain/errors.py` says `detail` goes to the client as it is. Once an endpoint looks up by a path parameter, either map these errors or make the messages generic.
+- **S10b:** `loaded_files` and the hash read only the files named in the loader. S10b's `count_todos(root)` should use `loaded_files` too, so a note in a file the loader ignores never counts.
+- A frontmatter `slug:` or `body_md:` key in a gold example is silently replaced by the file name and the real body. No catalog file has one; add an error if it ever matters.
+- Reviewer nits fixed: `_table([])` crashed on a catalog with no gates or tiers; the examples glob is now case-sensitive on every platform; the CRLF hash test now sets the line ends itself (a Windows checkout already has CRLF).

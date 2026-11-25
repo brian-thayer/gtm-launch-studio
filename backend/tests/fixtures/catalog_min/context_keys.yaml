@@ -1,0 +1,5 @@
+context_keys:
+  - { key: facts.summary, label: Summary, description: What it is., type: text, sources: [aha, document] }
+  - { key: facts.launch_date, label: Launch date, description: When it ships., type: date, sources: [aha] }
+  - { key: facts.needs_setup, label: Needs setup, description: Whether setup is needed., type: boolean, sources: [qa] }
+  - { key: facts.audience, label: Audience, description: Who it is for., type: list, sources: [note, qa] }

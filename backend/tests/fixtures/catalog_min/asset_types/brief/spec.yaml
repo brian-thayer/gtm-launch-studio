@@ -1,0 +1,8 @@
+key: brief
+name: Brief
+gate: gate_one
+audience: internal
+family: generic_doc
+foundation: true
+formats: [md]
+required_context: [facts.summary]

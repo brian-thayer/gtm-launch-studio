@@ -63,7 +63,7 @@ Configuration comes from `GTM_*` environment variables, or from a git-ignored `b
 | `GTM_SESSION_SECRET` | built-in dev value | Signs the session cookie. Required in production: at least 32 random characters. |
 | `GTM_DB_URL` | `sqlite:///<repo>/storage/gtm_studio.db` | SQLAlchemy URL. A relative SQLite path resolves against the repo root. |
 | `GTM_STORAGE_DIR` | `<repo>/storage` | Local runtime data. |
-| `GTM_CATALOG_DIR` | `<repo>/gtm_catalog` | The GTM framework as data. |
+| `GTM_CATALOG_DIR` | `<repo>/gtm_catalog` | The GTM framework as data. A relative value resolves against the repo root (for example `fixtures/demo/catalog`). The `--path` option of `gtm catalog` commands is different: it resolves against the working directory. |
 | `GTM_CONFIG_DIR` | `<repo>/config` | App configuration (dev users, model routes, pricing). |
 | `GTM_LLM_PROVIDER` | `mock` | `mock` or `bedrock`. |
 | `GTM_ALLOW_BEDROCK` | `false` | Bedrock calls cost money. Leave off unless you have decided to run them. |

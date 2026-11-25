@@ -1,0 +1,2 @@
+colors: { primary: "#112233", accent: "#445566" }
+fonts: { heading: Sans, body: Serif }

@@ -1,0 +1,23 @@
+roles:
+  - { key: role_a, label: Role A }
+  - { key: role_b, label: Role B }
+
+gates:
+  - key: gate_one
+    label: Gate One
+    short: One
+    order: 1
+    approver_roles: [role_a]
+    color: "#112233"
+  - key: gate_two
+    label: Gate Two
+    short: Two
+    order: 2
+    approver_roles: [role_a, role_b]
+    release_gate: true
+
+approved_gate_values: ["approved"]
+release_cutoff_values: ["cutoff"]
+
+readiness_categories:
+  - { key: category_one, label: Category One, gates: [gate_one] }

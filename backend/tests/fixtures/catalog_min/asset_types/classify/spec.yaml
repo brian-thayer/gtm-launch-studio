@@ -1,0 +1,9 @@
+key: classify
+name: Classify
+gate: gate_one
+audience: internal
+family: classification
+foundation: true
+decides: tier
+formats: [md]
+required_context: [facts.summary]

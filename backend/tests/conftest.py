@@ -22,9 +22,11 @@ from gtm_studio.api.app import create_app
 from gtm_studio.api.introspection import RouteInfo, list_routes
 from gtm_studio.audit.logging import QUIET_LIBRARIES, StderrHandler, configure_logging
 from gtm_studio.auth.dev_users import load_dev_users
+from gtm_studio.catalog.loader import load_catalog
 from gtm_studio.db.engine import make_engine, make_session_factory, sqlite_file
 from gtm_studio.db.migrate import upgrade
 from gtm_studio.db.uow import SqlUnitOfWork
+from gtm_studio.domain.catalog import Catalog
 from gtm_studio.services.identity import IdentityService, SeedSummary
 from gtm_studio.services.ports import UnitOfWorkFactory
 from gtm_studio.settings import REPO_ROOT, Settings
@@ -197,6 +199,27 @@ def seeded(uow_factory: UnitOfWorkFactory) -> SeedSummary:
     """The migrated database with the demo users from ``config/dev_users.yaml`` in it."""
     seeds = load_dev_users(REPO_ROOT / "config" / "dev_users.yaml")
     return IdentityService(uow_factory).seed_dev_users(seeds)
+
+
+CATALOG_MIN = Path(__file__).parent / "fixtures" / "catalog_min"
+
+
+@pytest.fixture
+def catalog_min_dir() -> Path:
+    """The tiny committed catalog (neutral names). Read it; copy it with ``catalog_min_copy`` to change it."""
+    return CATALOG_MIN
+
+
+@pytest.fixture
+def catalog_min_copy(tmp_path: Path) -> Path:
+    """A writable copy of ``catalog_min`` in tmp_path, for tests that break or edit a catalog."""
+    return Path(shutil.copytree(CATALOG_MIN, tmp_path / "catalog"))
+
+
+@pytest.fixture
+def catalog_min(catalog_min_dir: Path) -> Catalog:
+    """``catalog_min`` loaded."""
+    return load_catalog(catalog_min_dir)
 
 
 @pytest.fixture

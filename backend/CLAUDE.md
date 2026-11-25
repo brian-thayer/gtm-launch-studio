@@ -9,8 +9,9 @@
 - `audit/`: `SqlAuditLog` (the `AuditLog` port), the request context (`context.py`), the request-ID and access-log middleware (`middleware.py`) and logging set-up (`logging.py`).
 - `api/`: FastAPI routers. These are thin: validate, call a service, map to a response schema.
 - `worker/`: the job queue consumer.
-- `catalog/`: the `gtm_catalog/` file loader and validator (IO). The catalog's Pydantic models are pure, so they live in `domain/catalog.py`.
-- `cli.py`: the Typer app `gtm` (`worker`, `db`, `catalog`, `openapi`, `seed`).
+- `domain/catalog.py`: the catalog's frozen Pydantic models (gates, tiers, asset types, brand) and their lookups: `Catalog.matrix()`, `core_assets()`, `approver_roles_for()`. Pure, so a lookup that fails raises `NotFoundError`.
+- `catalog/`: the `gtm_catalog/` file IO. `loader.py` (`load_catalog`, `catalog_present`, `loaded_files`, `CatalogLoadError`, which names the file), `frontmatter.py` (YAML header split, rubric criteria) and `hashing.py` (`catalog_version_hash`: 12 hex characters over the loaded files, CRLF-insensitive). The validator comes in S10b.
+- `cli.py`: the Typer app `gtm` (`worker`, `db`, `catalog`, `openapi`, `seed`). `gtm catalog show [--path P]` prints a catalog's hash, gates, tiers, tier × gate matrix and triggers (`--path` is relative to the working directory).
 
 ## Layering (enforced by `uv run lint-imports`)
 `cli` > `api` | `worker` > infrastructure > `services` > `domain`. Infrastructure is one layer: `adapters`, `db`, `auth`, `audit` and `catalog` may import each other, so `audit` can use `db` models and `auth` can use `audit.context`. `api` and `worker` must not import each other. `domain` also may not import `gtm_studio.settings`, `yaml` or `alembic`, and `services` may not import fastapi, starlette, sqlalchemy, alembic, yaml, anthropic, boto3, authlib or httpx. (authlib and `httpx2`, its HTTP client, are used only in `auth/oidc.py`.) If a contract blocks legitimate work, stop and say so: don't loosen it silently.
@@ -66,7 +67,7 @@
 - `tests/unit/` covers domain code, with no DB.
 - `tests/service/` runs against a temp SQLite DB migrated with Alembic: fixtures `migrated_engine` (a fresh database per test at head: a file copy of `_migrated_template`, which Alembic migrates once per run) and `db_session` (a session on it). Tests of Alembic itself (`test_migrations.py`) override `migrated_engine` to run the migrations. The `client` fixture depends on `migrated_engine`, so API tests get the schema too.
 - `tests/api/` uses FastAPI `TestClient` with the `login_as(role_key)` fixture: it seeds the dev users (`seeded`), signs in as the first one holding that role and sends the CSRF header (`csrf=False` leaves it off). Each call gets its own cookie jar. The `app` fixture is the app it uses, so a test can add a probe route before calling it. `uow_factory` gives a service the migrated test database.
-- Fixtures: `tests/fixtures/` holds a minimal catalog (`catalog_min/`) and sample Aha! files.
+- Fixtures: `tests/fixtures/` holds a minimal catalog (`catalog_min/`, neutral names) and sample Aha! files. Use the `catalog_min_dir` (its path), `catalog_min` (loaded) and `catalog_min_copy` (a writable copy in `tmp_path`, for tests that break it) fixtures.
 - Markers: `bedrock` (real AWS calls, deselected by default) and `slow`.
 - pytest runs in `importlib` import mode: test folders have no `__init__.py`, and tests can't import from `conftest.py` or from each other. Share code through fixtures, or put it in `src/`.
 - An autouse fixture removes `GTM_*` variables and disables the `.env` file, so tests never see the developer's machine. Build settings with `Settings(env="test", ...)` (the `settings` fixture). Don't pass `_env_file=`: pyright rejects it. To test `.env` loading, `monkeypatch.setitem(Settings.model_config, "env_file", path)`.

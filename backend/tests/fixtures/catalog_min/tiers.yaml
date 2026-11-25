@@ -1,0 +1,29 @@
+inherits_lower: true
+
+tiers:
+  - key: tier_big
+    label: Big
+    rank: 1
+    description: The largest launches.
+    examples: [An example of a big launch]
+    criteria:
+      - { key: reach, label: Reach, description: How many customers it touches. }
+    channels: [email]
+    core: [deep_dive]
+    optional: [extra_note]
+    timing:
+      anchor: facts.launch_date
+      plan_start_days: -56
+      core_due_days: -14
+  - key: tier_small
+    label: Small
+    rank: 2
+    description: The smallest launches.
+    core: [brief, classify]
+
+triggers:
+  - key: needs_setup
+    label: Needs setup
+    description: The customer has to set something up.
+    context_key: facts.needs_setup
+    assets: [setup_guide]

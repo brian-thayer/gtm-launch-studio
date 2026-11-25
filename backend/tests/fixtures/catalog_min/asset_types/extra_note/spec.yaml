@@ -1,0 +1,7 @@
+key: extra_note
+name: Extra note
+gate: gate_two
+audience: internal
+family: generic_doc
+formats: [md]
+required_context: [facts.summary]

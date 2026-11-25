@@ -1,0 +1,7 @@
+key: setup_guide
+name: Setup guide
+gate: gate_two
+audience: external
+family: generic_doc
+formats: [md]
+required_context: [facts.summary]
