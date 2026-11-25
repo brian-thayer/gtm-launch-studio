@@ -35,6 +35,10 @@ class AuditAction(StrEnum):
     USER_ROLES_SYNCED = "user.roles_synced"  # the IdP's groups changed the user's role grants
     USER_SEEDED = "user.seeded"  # `gtm seed dev-users` created the user
     USER_ROLES_SET = "user.roles_set"  # `gtm seed dev-users` changed the user's role grants
+    # The catalog (entity "catalog"). `actor` is the admin who asked, or None at start-up.
+    CATALOG_RELOADED = "catalog.reloaded"  # an admin reloaded it and the new files were taken
+    CATALOG_RELOAD_REJECTED = "catalog.reload_rejected"  # the new files had errors: the old catalog stays
+    CATALOG_ROLES_SYNCED = "catalog.roles_synced"  # the roles table was brought in line with the catalog
 
 
 def canonical_hash(obj: Any) -> str:

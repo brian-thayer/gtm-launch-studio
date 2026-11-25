@@ -59,7 +59,7 @@ def dev_login(
     identity.record_login(actor, "dev")
     bind_actor(actor.id)  # this request is now the actor's, for the access log
     start_session(request.session, actor.id)
-    return Me.from_actor(actor)
+    return Me.from_actor(actor, identity.describe_roles(actor.roles))
 
 
 @router.get(
@@ -130,5 +130,5 @@ def logout(
 
 
 @router.get("/me", response_model=Me)
-def me(actor: Annotated[Actor, Depends(current_actor)]) -> Me:
-    return Me.from_actor(actor)
+def me(actor: Annotated[Actor, Depends(current_actor)], identity: IdentityDep) -> Me:
+    return Me.from_actor(actor, identity.describe_roles(actor.roles))

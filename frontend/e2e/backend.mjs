@@ -23,6 +23,7 @@ const env = {
   GTM_ENV: "test",
   GTM_LLM_PROVIDER: "mock", // never Bedrock
   GTM_DB_URL: "sqlite:///storage/e2e.db",
+  GTM_CATALOG_DIR: "fixtures/demo/catalog", // relative to the repo root: the synthetic demo catalog
 };
 
 function run(command, args) {

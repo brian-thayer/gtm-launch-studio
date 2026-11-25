@@ -42,8 +42,8 @@ def test_interactive_docs_are_available_outside_production(client: TestClient) -
     assert client.get("/api/openapi.json").status_code == 200
 
 
-def test_interactive_docs_are_off_in_production(settings: Settings) -> None:
-    prod = settings.model_copy(update={"env": "production"})
+def test_interactive_docs_are_off_in_production(no_catalog_settings: Settings) -> None:
+    prod = no_catalog_settings.model_copy(update={"env": "production"})
     with TestClient(create_app(prod)) as client:
         assert client.get("/api/docs").status_code == 404
         assert client.get("/api/openapi.json").status_code == 404
@@ -64,8 +64,8 @@ def test_cors_is_off_by_default(client: TestClient) -> None:
     assert "access-control-allow-origin" not in client.get("/api/health", headers={"Origin": _ORIGIN}).headers
 
 
-def test_cors_allows_only_the_configured_origins(settings: Settings) -> None:
-    cors = settings.model_copy(update={"cors_origins": [_ORIGIN]})
+def test_cors_allows_only_the_configured_origins(no_catalog_settings: Settings) -> None:
+    cors = no_catalog_settings.model_copy(update={"cors_origins": [_ORIGIN]})
     with TestClient(create_app(cors)) as client:
         preflight = client.options("/api/health", headers=_PREFLIGHT)
         assert preflight.status_code == 200

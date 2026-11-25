@@ -22,14 +22,16 @@ from starlette.middleware.sessions import SessionMiddleware
 
 from gtm_studio import __version__
 from gtm_studio.api.errors import register_exception_handlers
-from gtm_studio.api.routes import activity, auth, health
+from gtm_studio.api.routes import activity, auth, catalog, health
 from gtm_studio.audit.logging import configure_logging
 from gtm_studio.audit.middleware import REQUEST_ID_HEADER, RequestContextMiddleware
 from gtm_studio.auth.csrf import CsrfHeaderMiddleware
 from gtm_studio.auth.oidc import OidcAuthProvider, load_role_map
 from gtm_studio.auth.session import SESSION_COOKIE, SESSION_MAX_AGE
+from gtm_studio.catalog.source import FileCatalogSource
 from gtm_studio.db.engine import make_engine, make_session_factory
 from gtm_studio.db.uow import SqlUnitOfWork
+from gtm_studio.services.catalog import CatalogService
 from gtm_studio.services.identity import IdentityService
 from gtm_studio.services.ports import UnitOfWorkFactory
 from gtm_studio.settings import DEV_SESSION_SECRET, Settings
@@ -62,6 +64,11 @@ async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
     app.state.uow_factory = uow_factory
     app.state.oidc_provider = None
     try:
+        # After the engine: the role sync writes to the database. No catalog is a state (endpoints answer
+        # 404); one with errors raises CatalogStartupError and the app does not start (ADR-0005).
+        catalog_service = CatalogService(FileCatalogSource(settings.catalog_dir), uow_factory)
+        catalog_service.load_initial()
+        app.state.catalog_service = catalog_service
         if settings.auth_provider == "oidc":
             # Read the group -> role map now: a missing or malformed file stops the API at start-up
             # instead of failing someone's first sign-in. Building the provider does no network IO; the
@@ -117,4 +124,5 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(health.router, prefix=API_PREFIX)
     app.include_router(auth.router, prefix=API_PREFIX)
     app.include_router(activity.router, prefix=API_PREFIX)
+    app.include_router(catalog.router, prefix=API_PREFIX)
     return app

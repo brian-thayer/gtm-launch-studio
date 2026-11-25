@@ -8,16 +8,21 @@
   the URLs.
   -Stop: stops the windows this script opened, plus whatever still listens on 8000 or 5173 (with its
   child processes).
+  -Catalog <path>: the catalog folder the API and worker load (GTM_CATALOG_DIR), relative to the current
+  directory or absolute. Default: gtm_catalog/ once it has a lifecycle.yaml, otherwise the synthetic demo
+  catalog in fixtures/demo/catalog. The script prints which one it chose.
 
   Keep the ports in step with frontend/vite.config.ts and frontend/playwright.config.ts.
 
 .EXAMPLE
   powershell -File scripts/dev.ps1
+  powershell -File scripts/dev.ps1 -Catalog fixtures/demo/catalog
   powershell -File scripts/dev.ps1 -Stop
 #>
 [CmdletBinding()]
 param(
-    [switch]$Stop
+    [switch]$Stop,
+    [string]$Catalog
 )
 
 $Root = Split-Path -Parent $PSScriptRoot
@@ -121,6 +126,23 @@ if ($busy.Count -gt 0) {
     Write-Warning 'Not starting. Run `powershell -File scripts/dev.ps1 -Stop` first.'
     exit 1
 }
+
+# Which catalog the API and worker load. An explicit -Catalog must exist; the default is the real catalog
+# once someone has started it (a lifecycle.yaml), otherwise the synthetic demo one. The windows inherit the
+# variable, and so does `gtm seed dev-users` below (it warns about seeded roles the catalog doesn't declare).
+if ($Catalog) {
+    if (-not (Test-Path -LiteralPath $Catalog -PathType Container)) {
+        Write-Error "-Catalog '$Catalog' is not a folder."
+        exit 1
+    }
+    $CatalogDir = (Resolve-Path -LiteralPath $Catalog).Path
+} elseif (Test-Path (Join-Path $Root 'gtm_catalog\lifecycle.yaml')) {
+    $CatalogDir = Join-Path $Root 'gtm_catalog'
+} else {
+    $CatalogDir = Join-Path $Root 'fixtures\demo\catalog'
+}
+$env:GTM_CATALOG_DIR = $CatalogDir
+Write-Host "Catalog: $CatalogDir"
 
 if (-not (Add-UvToPath)) {
     Write-Error 'uv was not found. Install it with `py -m pip install --user uv` (see README.md).'

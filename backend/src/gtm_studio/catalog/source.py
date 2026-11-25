@@ -1,10 +1,11 @@
-"""Load a catalog folder and say everything that is wrong with it (S15 wraps this for the running app)."""
+"""Load a catalog folder and say everything that is wrong with it. ``FileCatalogSource`` is what the running
+app (``services/catalog.py``) reads the catalog through."""
 
 from collections.abc import Mapping
 from pathlib import Path
 
 from gtm_studio.catalog.families import KNOWN_FAMILIES
-from gtm_studio.catalog.loader import CatalogLoadError, load_catalog
+from gtm_studio.catalog.loader import CatalogLoadError, catalog_present, load_catalog
 from gtm_studio.catalog.todos import MARKER, count_todos
 from gtm_studio.domain.catalog import Catalog, Issue
 from gtm_studio.domain.catalog_rules import validate
@@ -37,3 +38,19 @@ def check_catalog(
         for where, count in sorted(counts.items())
     ]
     return catalog, issues
+
+
+class FileCatalogSource:
+    """The ``CatalogSource`` port over a ``gtm_catalog/``-shaped folder."""
+
+    def __init__(self, root: Path) -> None:
+        self._root = root
+
+    def present(self) -> bool:
+        return catalog_present(self._root)
+
+    def check(self) -> tuple[Catalog | None, list[Issue]]:
+        return check_catalog(self._root)
+
+    def todo_count(self) -> int:
+        return sum(count_todos(self._root).values())

@@ -10,7 +10,8 @@ from types import TracebackType
 from typing import Any, Protocol, Self
 
 from gtm_studio.domain.audit import AuditEventView, AuditFilters
-from gtm_studio.domain.identity import Actor, RoleSource, UserRecord
+from gtm_studio.domain.catalog import Catalog, Issue
+from gtm_studio.domain.identity import Actor, RoleRecord, RoleSource, UserRecord
 from gtm_studio.domain.pagination import Page
 
 
@@ -36,6 +37,15 @@ class IdentityRepository(Protocol):
         is, whatever ``active`` says."""
         ...
 
+    def list_roles(self) -> list[RoleRecord]:
+        """Every role, active or not, ordered by key."""
+        ...
+
+    def put_role(self, key: str, label: str, *, source: RoleSource, active: bool) -> bool:
+        """Create the role, or **overwrite** an existing one's label, source and active flag (unlike
+        ``ensure_role``). True when anything changed."""
+        ...
+
     def set_roles(
         self, user_id: str, role_keys: Collection[str], *, source: RoleSource, granted_by: str | None = None
     ) -> tuple[frozenset[str], frozenset[str]]:
@@ -52,6 +62,23 @@ class IdentityRepository(Protocol):
         ...
 
     def set_last_login(self, user_id: str, at: datetime) -> None: ...
+
+
+class CatalogSource(Protocol):
+    """Where the catalog's files are. ``catalog/source.py`` reads a folder; a test can answer from memory."""
+
+    def present(self) -> bool:
+        """Whether anyone has started a catalog here (the folder has a ``lifecycle.yaml``)."""
+        ...
+
+    def check(self) -> tuple[Catalog | None, list[Issue]]:
+        """Read and validate it. ``(None, [an error naming the file])`` when it can't be loaded at all;
+        otherwise the catalog (even with errors) and every error and warning."""
+        ...
+
+    def todo_count(self) -> int:
+        """How many ``TODO(confirm)`` markers the loaded files hold: questions for a person, never errors."""
+        ...
 
 
 class AuditLog(Protocol):

@@ -198,16 +198,16 @@ def test_filters(login_as: LoginAs, uow_factory: UnitOfWorkFactory) -> None:
     with uow_factory() as uow:
         uow.audit.record(None, "asset.approved", "asset", "a-1")
         uow.audit.record(None, "asset.rejected", "asset", "a-2")
-        uow.audit.record(None, "catalog.reloaded", "catalog", "c-1")
+        uow.audit.record(None, "release.cutoff", "release", "r-1")
 
     def actions(**params: str) -> list[str]:
         return [e["action"] for e in _activity(admin, **params)["items"]]
 
     assert actions(action_prefix="asset.") == ["asset.rejected", "asset.approved"]
-    assert actions(entity_type="catalog") == ["catalog.reloaded"]
+    assert actions(entity_type="release") == ["release.cutoff"]
     assert actions(entity_type="asset", entity_id="a-1") == ["asset.approved"]
-    assert actions(entity_id="c-1", action_prefix="catalog.") == ["catalog.reloaded"]
-    assert actions(entity_type="asset", entity_id="c-1") == []
+    assert actions(entity_id="r-1", action_prefix="release.") == ["release.cutoff"]
+    assert actions(entity_type="asset", entity_id="r-1") == []
     admin_id = admin.get("/api/auth/me").json()["id"]
     assert set(actions(actor_id=admin_id)) == {"auth.login"}
     assert actions(actor_id=MISSING_ID) == []

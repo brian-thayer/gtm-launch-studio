@@ -20,6 +20,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 AuthProviderName = Literal["dev", "oidc"]
 RoleSource = Literal["system", "dev_seed", "catalog", "oidc"]
+RoleKind = Literal["system", "approver"]
 
 ADMIN_ROLE = "admin"
 VIEWER_ROLE = "viewer"
@@ -29,11 +30,26 @@ ROLE_KEY = re.compile(r"[a-z][a-z0-9_]{0,49}")
 """What a role key may look like (``roles.key`` is 50 characters). Check one with ``check_role_key``."""
 
 
+def role_kind(key: str) -> RoleKind:
+    """``system`` for ``admin`` and ``viewer``; every other role is an ``approver`` (``permissions_for``)."""
+    return "system" if key in SYSTEM_ROLES else "approver"
+
+
 def check_role_key(key: str) -> str:
     """``key`` when it is a valid role key, else ``ValueError`` (so a Pydantic validator can use it)."""
     if not ROLE_KEY.fullmatch(key):
         raise ValueError(f"invalid role key {key!r}: must be lowercase letters, digits and underscores")
     return key
+
+
+@dataclass(frozen=True)
+class RoleRecord:
+    """A row of the roles table. An inactive role grants nothing, but its grants are kept for history."""
+
+    key: str
+    label: str
+    source: RoleSource
+    active: bool
 
 
 class DevUserSeed(BaseModel):

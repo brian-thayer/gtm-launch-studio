@@ -21,6 +21,7 @@ export const adminMe: Me = {
   email: "avery.admin@example.test",
   display_name: "Avery Admin",
   roles: ["admin"],
+  role_info: [{ key: "admin", label: "Administrator", kind: "system" }],
   permissions: ALL_PERMISSIONS,
 };
 
@@ -29,6 +30,7 @@ export const viewerMe: Me = {
   email: "val.viewer@example.test",
   display_name: "Val Viewer",
   roles: ["viewer"],
+  role_info: [{ key: "viewer", label: "Viewer", kind: "system" }],
   permissions: ["solution:read", "catalog:read"],
 };
 

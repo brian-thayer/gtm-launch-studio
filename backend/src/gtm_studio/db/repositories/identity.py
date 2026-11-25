@@ -9,7 +9,7 @@ from sqlalchemy import Select, delete, select
 from sqlalchemy.orm import Session
 
 from gtm_studio.db.models.identity import Role, User, UserRole
-from gtm_studio.domain.identity import AuthProviderName, RoleSource, UserRecord
+from gtm_studio.domain.identity import AuthProviderName, RoleRecord, RoleSource, UserRecord
 
 
 class SqlIdentityRepository:
@@ -49,6 +49,25 @@ class SqlIdentityRepository:
         if self._session.get(Role, key) is not None:
             return False
         self._session.add(Role(key=key, label=label, source=source, active=active))
+        self._session.flush()
+        return True
+
+    def list_roles(self) -> list[RoleRecord]:
+        rows = self._session.scalars(select(Role).order_by(Role.key))
+        return [
+            RoleRecord(key=r.key, label=r.label, source=cast(RoleSource, r.source), active=r.active)
+            for r in rows
+        ]
+
+    def put_role(self, key: str, label: str, *, source: RoleSource, active: bool) -> bool:
+        row = self._session.get(Role, key)
+        if row is None:
+            self._session.add(Role(key=key, label=label, source=source, active=active))
+            self._session.flush()
+            return True
+        if (row.label, row.source, row.active) == (label, source, active):
+            return False
+        row.label, row.source, row.active = label, source, active
         self._session.flush()
         return True
 

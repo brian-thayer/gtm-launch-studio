@@ -19,6 +19,7 @@ from gtm_studio.db import migrate
 from gtm_studio.db.engine import make_engine, make_session_factory
 from gtm_studio.db.uow import SqlUnitOfWork
 from gtm_studio.domain.catalog import Catalog, IssueSummary
+from gtm_studio.domain.identity import SYSTEM_ROLES
 from gtm_studio.services.identity import IdentityService, SeedError
 from gtm_studio.services.ports import UnitOfWorkFactory
 from gtm_studio.settings import Settings
@@ -112,7 +113,8 @@ def seed_dev_users(
     engine = make_engine(settings)
     try:
         uow_factory: UnitOfWorkFactory = partial(SqlUnitOfWork, make_session_factory(engine))
-        summary = IdentityService(uow_factory).seed_dev_users(load_dev_users(source))
+        seeds = load_dev_users(source)
+        summary = IdentityService(uow_factory).seed_dev_users(seeds)
     except SeedError as exc:
         typer.echo(f"seeding failed: {exc}", err=True)
         raise typer.Exit(1) from exc
@@ -122,6 +124,25 @@ def seed_dev_users(
         f"dev users: {summary.users_created} created, {summary.users_updated} updated, "
         f"{summary.users_unchanged} unchanged; roles: {summary.roles_created} created"
     )
+    _warn_about_undeclared_roles(settings.catalog_dir, {role for seed in seeds for role in seed.roles})
+
+
+def _warn_about_undeclared_roles(catalog_dir: Path, seeded_roles: set[str]) -> None:
+    """Tell the person seeding which roles the catalog doesn't declare. They still work as approver roles,
+    but no gate names them, so nobody holding only those can approve anything. Never fails the command."""
+    if not catalog_present(catalog_dir):
+        return
+    try:
+        catalog = load_catalog(catalog_dir)
+    except CatalogLoadError:
+        return  # `gtm catalog validate` is where a broken catalog is reported
+    declared = {role.key for role in catalog.lifecycle.roles} | SYSTEM_ROLES
+    if undeclared := sorted(seeded_roles - declared):
+        typer.echo(
+            f"warning: the catalog at {catalog_dir} does not declare these seeded roles: "
+            f"{', '.join(undeclared)}",
+            err=True,
+        )
 
 
 def _table(rows: list[list[str]]) -> list[str]:

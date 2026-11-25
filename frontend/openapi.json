@@ -147,6 +147,245 @@
         "title": "ActivityPage",
         "type": "object"
       },
+      "AssetRefOut": {
+        "properties": {
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "key",
+          "name"
+        ],
+        "title": "AssetRefOut",
+        "type": "object"
+      },
+      "AssetTypeResponse": {
+        "properties": {
+          "approver_roles": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Approver Roles",
+            "type": "array"
+          },
+          "examples": {
+            "items": {
+              "$ref": "#/components/schemas/GoldExample"
+            },
+            "title": "Examples",
+            "type": "array"
+          },
+          "prompt_md": {
+            "title": "Prompt Md",
+            "type": "string"
+          },
+          "rubric": {
+            "$ref": "#/components/schemas/RubricOut"
+          },
+          "spec": {
+            "$ref": "#/components/schemas/AssetTypeSpec"
+          }
+        },
+        "required": [
+          "spec",
+          "prompt_md",
+          "rubric",
+          "examples",
+          "approver_roles"
+        ],
+        "title": "AssetTypeResponse",
+        "type": "object"
+      },
+      "AssetTypeSpec": {
+        "additionalProperties": false,
+        "properties": {
+          "approver_roles": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Approver Roles"
+          },
+          "audience": {
+            "enum": [
+              "internal",
+              "external"
+            ],
+            "title": "Audience",
+            "type": "string"
+          },
+          "decides": {
+            "anyOf": [
+              {
+                "const": "tier",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Decides"
+          },
+          "depends_on": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Depends On",
+            "type": "array"
+          },
+          "effort": {
+            "default": "medium",
+            "enum": [
+              "low",
+              "medium",
+              "high",
+              "xhigh",
+              "max"
+            ],
+            "title": "Effort",
+            "type": "string"
+          },
+          "family": {
+            "title": "Family",
+            "type": "string"
+          },
+          "formats": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Formats",
+            "type": "array"
+          },
+          "foundation": {
+            "default": false,
+            "title": "Foundation",
+            "type": "boolean"
+          },
+          "gate": {
+            "title": "Gate",
+            "type": "string"
+          },
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "length": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "integer"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Length"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "required_context": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Required Context",
+            "type": "array"
+          },
+          "route": {
+            "default": "writer",
+            "title": "Route",
+            "type": "string"
+          }
+        },
+        "required": [
+          "key",
+          "name",
+          "gate",
+          "audience",
+          "family",
+          "formats"
+        ],
+        "title": "AssetTypeSpec",
+        "type": "object"
+      },
+      "AssetTypeSummary": {
+        "properties": {
+          "audience": {
+            "enum": [
+              "internal",
+              "external"
+            ],
+            "title": "Audience",
+            "type": "string"
+          },
+          "decides": {
+            "anyOf": [
+              {
+                "const": "tier",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Decides"
+          },
+          "example_count": {
+            "title": "Example Count",
+            "type": "integer"
+          },
+          "family": {
+            "title": "Family",
+            "type": "string"
+          },
+          "foundation": {
+            "title": "Foundation",
+            "type": "boolean"
+          },
+          "gate": {
+            "title": "Gate",
+            "type": "string"
+          },
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "key",
+          "name",
+          "gate",
+          "audience",
+          "family",
+          "foundation",
+          "decides",
+          "example_count"
+        ],
+        "title": "AssetTypeSummary",
+        "type": "object"
+      },
       "AuthOptions": {
         "description": "What the login page shows. ``dev_users`` is filled only for the dev provider.",
         "properties": {
@@ -170,6 +409,101 @@
           "provider"
         ],
         "title": "AuthOptions",
+        "type": "object"
+      },
+      "Brand": {
+        "additionalProperties": false,
+        "properties": {
+          "claims_md": {
+            "title": "Claims Md",
+            "type": "string"
+          },
+          "legal_md": {
+            "title": "Legal Md",
+            "type": "string"
+          },
+          "terminology": {
+            "$ref": "#/components/schemas/Terminology"
+          },
+          "visual": {
+            "$ref": "#/components/schemas/Visual"
+          },
+          "voice_md": {
+            "title": "Voice Md",
+            "type": "string"
+          }
+        },
+        "required": [
+          "voice_md",
+          "claims_md",
+          "legal_md",
+          "terminology",
+          "visual"
+        ],
+        "title": "Brand",
+        "type": "object"
+      },
+      "CatalogResponse": {
+        "properties": {
+          "asset_types": {
+            "items": {
+              "$ref": "#/components/schemas/AssetTypeSummary"
+            },
+            "title": "Asset Types",
+            "type": "array"
+          },
+          "gates": {
+            "items": {
+              "$ref": "#/components/schemas/Gate"
+            },
+            "title": "Gates",
+            "type": "array"
+          },
+          "issues": {
+            "$ref": "#/components/schemas/IssuesOut"
+          },
+          "loaded_at": {
+            "format": "date-time",
+            "title": "Loaded At",
+            "type": "string"
+          },
+          "roles": {
+            "items": {
+              "$ref": "#/components/schemas/RoleDef"
+            },
+            "title": "Roles",
+            "type": "array"
+          },
+          "tiers": {
+            "items": {
+              "$ref": "#/components/schemas/TierOut"
+            },
+            "title": "Tiers",
+            "type": "array"
+          },
+          "triggers": {
+            "items": {
+              "$ref": "#/components/schemas/Trigger"
+            },
+            "title": "Triggers",
+            "type": "array"
+          },
+          "version_hash": {
+            "title": "Version Hash",
+            "type": "string"
+          }
+        },
+        "required": [
+          "version_hash",
+          "loaded_at",
+          "issues",
+          "roles",
+          "gates",
+          "tiers",
+          "triggers",
+          "asset_types"
+        ],
+        "title": "CatalogResponse",
         "type": "object"
       },
       "DevLoginRequest": {
@@ -212,6 +546,125 @@
         "title": "DevUserOption",
         "type": "object"
       },
+      "Gate": {
+        "additionalProperties": false,
+        "properties": {
+          "approver_roles": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Approver Roles",
+            "type": "array"
+          },
+          "color": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Color"
+          },
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "order": {
+            "title": "Order",
+            "type": "integer"
+          },
+          "release_gate": {
+            "default": false,
+            "title": "Release Gate",
+            "type": "boolean"
+          },
+          "short": {
+            "title": "Short",
+            "type": "string"
+          }
+        },
+        "required": [
+          "key",
+          "label",
+          "short",
+          "order",
+          "approver_roles"
+        ],
+        "title": "Gate",
+        "type": "object"
+      },
+      "GoldExample": {
+        "additionalProperties": false,
+        "properties": {
+          "body_md": {
+            "title": "Body Md",
+            "type": "string"
+          },
+          "context_summary": {
+            "title": "Context Summary",
+            "type": "string"
+          },
+          "redacted": {
+            "title": "Redacted",
+            "type": "boolean"
+          },
+          "redactions": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Redactions",
+            "type": "array"
+          },
+          "slug": {
+            "title": "Slug",
+            "type": "string"
+          },
+          "source": {
+            "title": "Source",
+            "type": "string"
+          },
+          "tier": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tier"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "why_good": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Why Good",
+            "type": "array"
+          }
+        },
+        "required": [
+          "slug",
+          "title",
+          "source",
+          "redacted",
+          "why_good",
+          "context_summary",
+          "body_md"
+        ],
+        "title": "GoldExample",
+        "type": "object"
+      },
       "HTTPValidationError": {
         "properties": {
           "detail": {
@@ -227,6 +680,25 @@
       },
       "HealthResponse": {
         "properties": {
+          "catalog": {
+            "enum": [
+              "ok",
+              "missing"
+            ],
+            "title": "Catalog",
+            "type": "string"
+          },
+          "catalog_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Catalog Version"
+          },
           "db": {
             "enum": [
               "ok",
@@ -258,9 +730,204 @@
           "status",
           "version",
           "env",
-          "db"
+          "db",
+          "catalog",
+          "catalog_version"
         ],
         "title": "HealthResponse",
+        "type": "object"
+      },
+      "Issue": {
+        "additionalProperties": false,
+        "description": "One problem found in a catalog. ``where`` is catalog-relative, e.g. ``tiers.yaml: tiers[t1].core``.",
+        "properties": {
+          "level": {
+            "enum": [
+              "error",
+              "warning"
+            ],
+            "title": "Level",
+            "type": "string"
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          },
+          "where": {
+            "title": "Where",
+            "type": "string"
+          }
+        },
+        "required": [
+          "level",
+          "where",
+          "message"
+        ],
+        "title": "Issue",
+        "type": "object"
+      },
+      "IssuesOut": {
+        "properties": {
+          "errors": {
+            "title": "Errors",
+            "type": "integer"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/Issue"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "todo_count": {
+            "title": "Todo Count",
+            "type": "integer"
+          },
+          "warnings": {
+            "title": "Warnings",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "errors",
+          "warnings",
+          "todo_count",
+          "items"
+        ],
+        "title": "IssuesOut",
+        "type": "object"
+      },
+      "MatrixGateOut": {
+        "properties": {
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "short": {
+            "title": "Short",
+            "type": "string"
+          }
+        },
+        "required": [
+          "key",
+          "short"
+        ],
+        "title": "MatrixGateOut",
+        "type": "object"
+      },
+      "MatrixResponse": {
+        "properties": {
+          "gates": {
+            "items": {
+              "$ref": "#/components/schemas/MatrixGateOut"
+            },
+            "title": "Gates",
+            "type": "array"
+          },
+          "rows": {
+            "items": {
+              "$ref": "#/components/schemas/MatrixRowOut"
+            },
+            "title": "Rows",
+            "type": "array"
+          },
+          "undefined_assets": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Undefined Assets",
+            "type": "array"
+          }
+        },
+        "required": [
+          "gates",
+          "rows",
+          "undefined_assets"
+        ],
+        "title": "MatrixResponse",
+        "type": "object"
+      },
+      "MatrixRowOut": {
+        "properties": {
+          "cells": {
+            "items": {
+              "items": {
+                "$ref": "#/components/schemas/AssetRefOut"
+              },
+              "type": "array"
+            },
+            "title": "Cells",
+            "type": "array"
+          },
+          "optional": {
+            "items": {
+              "$ref": "#/components/schemas/AssetRefOut"
+            },
+            "title": "Optional",
+            "type": "array"
+          },
+          "tier": {
+            "$ref": "#/components/schemas/MatrixTierOut"
+          },
+          "triggers": {
+            "items": {
+              "$ref": "#/components/schemas/MatrixTriggerOut"
+            },
+            "title": "Triggers",
+            "type": "array"
+          }
+        },
+        "required": [
+          "tier",
+          "cells",
+          "optional",
+          "triggers"
+        ],
+        "title": "MatrixRowOut",
+        "type": "object"
+      },
+      "MatrixTierOut": {
+        "properties": {
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          }
+        },
+        "required": [
+          "key",
+          "label"
+        ],
+        "title": "MatrixTierOut",
+        "type": "object"
+      },
+      "MatrixTriggerOut": {
+        "properties": {
+          "assets": {
+            "items": {
+              "$ref": "#/components/schemas/AssetRefOut"
+            },
+            "title": "Assets",
+            "type": "array"
+          },
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          }
+        },
+        "required": [
+          "key",
+          "label",
+          "assets"
+        ],
+        "title": "MatrixTriggerOut",
         "type": "object"
       },
       "Me": {
@@ -284,6 +951,13 @@
             "title": "Permissions",
             "type": "array"
           },
+          "role_info": {
+            "items": {
+              "$ref": "#/components/schemas/RoleInfo"
+            },
+            "title": "Role Info",
+            "type": "array"
+          },
           "roles": {
             "items": {
               "type": "string"
@@ -297,6 +971,7 @@
           "email",
           "display_name",
           "roles",
+          "role_info",
           "permissions"
         ],
         "title": "Me",
@@ -316,6 +991,410 @@
         ],
         "title": "Permission",
         "type": "string"
+      },
+      "PreferredTerm": {
+        "additionalProperties": false,
+        "properties": {
+          "avoid": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Avoid",
+            "type": "array"
+          },
+          "use": {
+            "title": "Use",
+            "type": "string"
+          }
+        },
+        "required": [
+          "use",
+          "avoid"
+        ],
+        "title": "PreferredTerm",
+        "type": "object"
+      },
+      "ProductName": {
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "never": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Never",
+            "type": "array"
+          },
+          "rules": {
+            "default": "",
+            "title": "Rules",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "title": "ProductName",
+        "type": "object"
+      },
+      "ReloadResponse": {
+        "properties": {
+          "issues": {
+            "items": {
+              "$ref": "#/components/schemas/Issue"
+            },
+            "title": "Issues",
+            "type": "array"
+          },
+          "new_hash": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "New Hash"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "old_hash": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Old Hash"
+          }
+        },
+        "required": [
+          "ok",
+          "old_hash",
+          "new_hash",
+          "issues"
+        ],
+        "title": "ReloadResponse",
+        "type": "object"
+      },
+      "RoleDef": {
+        "additionalProperties": false,
+        "properties": {
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          }
+        },
+        "required": [
+          "key",
+          "label"
+        ],
+        "title": "RoleDef",
+        "type": "object"
+      },
+      "RoleInfo": {
+        "description": "A role the user holds, as the roles table describes it. ``kind`` tells the UI how to show it.",
+        "properties": {
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "system",
+              "approver"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          }
+        },
+        "required": [
+          "key",
+          "label",
+          "kind"
+        ],
+        "title": "RoleInfo",
+        "type": "object"
+      },
+      "RubricCriterion": {
+        "additionalProperties": false,
+        "properties": {
+          "body_md": {
+            "title": "Body Md",
+            "type": "string"
+          },
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "key",
+          "title",
+          "body_md"
+        ],
+        "title": "RubricCriterion",
+        "type": "object"
+      },
+      "RubricOut": {
+        "properties": {
+          "criteria": {
+            "items": {
+              "$ref": "#/components/schemas/RubricCriterion"
+            },
+            "title": "Criteria",
+            "type": "array"
+          },
+          "pass_threshold": {
+            "title": "Pass Threshold",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "pass_threshold",
+          "criteria"
+        ],
+        "title": "RubricOut",
+        "type": "object"
+      },
+      "Terminology": {
+        "additionalProperties": false,
+        "properties": {
+          "banned_external": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Banned External",
+            "type": "array"
+          },
+          "preferred": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/PreferredTerm"
+            },
+            "title": "Preferred",
+            "type": "array"
+          },
+          "product_names": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/ProductName"
+            },
+            "title": "Product Names",
+            "type": "array"
+          }
+        },
+        "title": "Terminology",
+        "type": "object"
+      },
+      "TierCriterion": {
+        "additionalProperties": false,
+        "properties": {
+          "description": {
+            "title": "Description",
+            "type": "string"
+          },
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          }
+        },
+        "required": [
+          "key",
+          "label",
+          "description"
+        ],
+        "title": "TierCriterion",
+        "type": "object"
+      },
+      "TierOut": {
+        "properties": {
+          "channels": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Channels",
+            "type": "array"
+          },
+          "criteria": {
+            "items": {
+              "$ref": "#/components/schemas/TierCriterion"
+            },
+            "title": "Criteria",
+            "type": "array"
+          },
+          "description": {
+            "title": "Description",
+            "type": "string"
+          },
+          "examples": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Examples",
+            "type": "array"
+          },
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "rank": {
+            "title": "Rank",
+            "type": "integer"
+          },
+          "timing": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TimingOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "key",
+          "label",
+          "rank",
+          "description",
+          "examples",
+          "criteria",
+          "channels",
+          "timing"
+        ],
+        "title": "TierOut",
+        "type": "object"
+      },
+      "TimingOut": {
+        "description": "Planning context, never an approval gate. Offsets are signed days from the anchor.",
+        "properties": {
+          "anchor": {
+            "title": "Anchor",
+            "type": "string"
+          },
+          "anchor_label": {
+            "title": "Anchor Label",
+            "type": "string"
+          },
+          "core_due_days": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Core Due Days"
+          },
+          "plan_start_days": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Plan Start Days"
+          }
+        },
+        "required": [
+          "anchor",
+          "anchor_label",
+          "plan_start_days",
+          "core_due_days"
+        ],
+        "title": "TimingOut",
+        "type": "object"
+      },
+      "Trigger": {
+        "additionalProperties": false,
+        "properties": {
+          "assets": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Assets",
+            "type": "array"
+          },
+          "context_key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Context Key"
+          },
+          "description": {
+            "title": "Description",
+            "type": "string"
+          },
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "tiers": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tiers"
+          }
+        },
+        "required": [
+          "key",
+          "label",
+          "description",
+          "assets"
+        ],
+        "title": "Trigger",
+        "type": "object"
       },
       "ValidationError": {
         "properties": {
@@ -355,6 +1434,48 @@
           "type"
         ],
         "title": "ValidationError",
+        "type": "object"
+      },
+      "Visual": {
+        "additionalProperties": false,
+        "properties": {
+          "colors": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "title": "Colors",
+            "type": "object"
+          },
+          "fonts": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "default": {},
+            "title": "Fonts",
+            "type": "object"
+          },
+          "logo": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Logo"
+          },
+          "slide": {
+            "additionalProperties": true,
+            "default": {},
+            "title": "Slide",
+            "type": "object"
+          }
+        },
+        "required": [
+          "colors"
+        ],
+        "title": "Visual",
         "type": "object"
       }
     }
@@ -779,6 +1900,160 @@
         "summary": "Options",
         "tags": [
           "auth"
+        ]
+      }
+    },
+    "/api/catalog": {
+      "get": {
+        "description": "The loaded catalog: version, issues, roles, gates, tiers, triggers and a summary of each asset type.",
+        "operationId": "catalog_overview",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CatalogResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "description": "No catalog is loaded (`no catalog loaded`)."
+          }
+        },
+        "summary": "Overview",
+        "tags": [
+          "catalog"
+        ]
+      }
+    },
+    "/api/catalog/asset-types/{key}": {
+      "get": {
+        "description": "One asset type: its spec, prompt, rubric, gold examples and who may approve it.",
+        "operationId": "catalog_asset_type",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "key",
+            "required": true,
+            "schema": {
+              "maxLength": 100,
+              "title": "Key",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AssetTypeResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "description": "No catalog is loaded, or it has no such asset type."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Asset Type",
+        "tags": [
+          "catalog"
+        ]
+      }
+    },
+    "/api/catalog/brand": {
+      "get": {
+        "description": "Voice, claims and legal guidance, terminology and the visual identity.",
+        "operationId": "catalog_brand",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Brand"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "description": "No catalog is loaded (`no catalog loaded`)."
+          }
+        },
+        "summary": "Brand",
+        "tags": [
+          "catalog"
+        ]
+      }
+    },
+    "/api/catalog/matrix": {
+      "get": {
+        "description": "Tiers (biggest first) by gates (in order): the core assets in each cell, plus each tier's optional\nassets and triggers. Computed by the backend; the UI only renders it.",
+        "operationId": "catalog_matrix",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MatrixResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "description": "No catalog is loaded (`no catalog loaded`)."
+          }
+        },
+        "summary": "Matrix",
+        "tags": [
+          "catalog"
+        ]
+      }
+    },
+    "/api/catalog/reload": {
+      "post": {
+        "description": "Read the catalog files again. Valid files replace the loaded catalog (and sync the approver roles).\nFiles with errors change nothing: the response is a 409 listing every issue. Either way it is audited.\nThis reloads the process that served the request only.",
+        "operationId": "catalog_reload",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReloadResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReloadResponse"
+                }
+              }
+            },
+            "description": "The files have errors: the old catalog stays."
+          }
+        },
+        "summary": "Reload",
+        "tags": [
+          "catalog"
         ]
       }
     },

@@ -3,8 +3,11 @@
 # The IDs are fixed on purpose: tests and e2e runs refer to them. Seeding is idempotent, and it never
 # removes users that are not listed here. It refuses to run when GTM_ENV=production.
 #
-# Roles: `admin` and `viewer` are system roles. The three approver roles below (pmm, product, cs) are
-# placeholder approver roles; replaced by catalog roles in S15.
+# Roles: `admin` and `viewer` are system roles. Every other role is an approver role, and the catalog
+# declares them (lifecycle.yaml `roles`): when the API starts it turns a role with the same key into a
+# catalog role, with the catalog's label. These five approver users match the demo catalog's roles
+# (fixtures/demo/catalog), one user per role. S11 re-aligns them to the real catalog.
+# `gtm seed dev-users` warns about roles the configured catalog doesn't declare.
 users:
   - id: "00000000-0000-4000-8000-000000000001"
     email: "avery.admin@example.test"
@@ -26,3 +29,11 @@ users:
     email: "casey.cs@example.test"
     display_name: "Casey Customer Success"
     roles: [cs]
+  - id: "00000000-0000-4000-8000-000000000006"
+    email: "sam.support@example.test"
+    display_name: "Sam Support"
+    roles: [support]
+  - id: "00000000-0000-4000-8000-000000000007"
+    email: "lee.launch@example.test"
+    display_name: "Lee Launch Owner"
+    roles: [launch_owner]

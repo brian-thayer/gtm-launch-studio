@@ -128,10 +128,11 @@ def browser(oidc_settings: Settings, seeded: SeedSummary, idp: FakeIdp) -> Itera
 
 
 def _events(uow_factory: UnitOfWorkFactory) -> list[AuditEventView]:
-    """Every audit event, oldest first, apart from the ones seeding wrote."""
+    """Every audit event, oldest first, apart from the seeding's and the catalog's start-up role sync."""
     with uow_factory() as uow:
         items = reversed(uow.audit.query(AuditFilters(), None, 100).items)
-    return [e for e in items if e.action not in (AuditAction.USER_SEEDED, AuditAction.USER_ROLES_SET)]
+    seeded = (AuditAction.USER_SEEDED, AuditAction.USER_ROLES_SET)
+    return [e for e in items if e.action not in seeded and not e.action.startswith("catalog.")]
 
 
 def _roles(browser: TestClient) -> list[str]:

@@ -86,14 +86,27 @@ def stderr_logs(settings: Settings, capsys: pytest.CaptureFixture[str]) -> Calla
     return read
 
 
+CATALOG_MIN = Path(__file__).parent / "fixtures" / "catalog_min"
+
+
 @pytest.fixture
 def settings(tmp_path: Path) -> Settings:
-    """Test settings: ``env=test``, no .env file, all storage under tmp_path."""
+    """Test settings: ``env=test``, no .env file, all storage under tmp_path, and ``catalog_min`` as the
+    catalog, so a test never reads the real ``gtm_catalog/``."""
     return Settings(
         env="test",
         db_url=f"sqlite:///{(tmp_path / 'gtm_studio.db').as_posix()}",
         storage_dir=tmp_path / "storage",
+        catalog_dir=CATALOG_MIN,
     )
+
+
+@pytest.fixture
+def no_catalog_settings(settings: Settings, tmp_path: Path) -> Settings:
+    """``settings`` with an empty folder as the catalog: the app starts with no catalog loaded."""
+    empty = tmp_path / "no_catalog"
+    empty.mkdir()
+    return settings.model_copy(update={"catalog_dir": empty})
 
 
 OIDC_ROLE_MAP = """\
@@ -130,6 +143,7 @@ def oidc_settings(settings: Settings, tmp_path: Path) -> Settings:
         env="test",
         db_url=settings.db_url,
         storage_dir=settings.storage_dir,
+        catalog_dir=settings.catalog_dir,
         auth_provider="oidc",
         oidc_issuer="https://idp.example.test",
         oidc_client_id="gtm-studio",
@@ -199,9 +213,6 @@ def seeded(uow_factory: UnitOfWorkFactory) -> SeedSummary:
     """The migrated database with the demo users from ``config/dev_users.yaml`` in it."""
     seeds = load_dev_users(REPO_ROOT / "config" / "dev_users.yaml")
     return IdentityService(uow_factory).seed_dev_users(seeds)
-
-
-CATALOG_MIN = Path(__file__).parent / "fixtures" / "catalog_min"
 
 
 @pytest.fixture

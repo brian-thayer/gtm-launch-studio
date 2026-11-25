@@ -9,7 +9,14 @@ import { devOptions, devUsers } from "./fixtures";
 const NOT_SIGNED_IN = { detail: "Not authenticated" };
 
 export const healthHandler = http.get("*/api/health", () =>
-  HttpResponse.json({ status: "ok", version: "0.0.0", env: "test", db: "ok" }),
+  HttpResponse.json({
+    status: "ok",
+    version: "0.0.0",
+    env: "test",
+    db: "ok",
+    catalog: "ok",
+    catalog_version: "0123456789ab",
+  }),
 );
 
 /**

@@ -67,3 +67,4 @@ git status --short ../gtm_catalog/   # nothing under sources/ except README.md
 - How the planner applies triggers and optional assets (S32).
 
 ## Notes
+- **From S15:** `config/dev_users.yaml` has one dev user per *demo*-catalog role (pmm, product, cs, support, launch_owner), and `tests/service/test_demo_catalog.py::test_the_dev_users_hold_exactly_the_demo_catalogs_roles` keeps them in step. When this step defines the real roles, re-align the dev users and that test (e2e still runs on the demo catalog, so keep a user for each demo role too, or point e2e at the real catalog).

@@ -4,9 +4,11 @@ from pathlib import Path
 
 import pytest
 
+from gtm_studio.auth.dev_users import load_dev_users
 from gtm_studio.catalog.loader import load_catalog
 from gtm_studio.catalog.source import check_catalog
 from gtm_studio.domain.catalog import Catalog
+from gtm_studio.domain.identity import SYSTEM_ROLES
 from gtm_studio.settings import REPO_ROOT
 
 DEMO = REPO_ROOT / "fixtures" / "demo" / "catalog"
@@ -69,3 +71,12 @@ def test_gate_approvers_are_role_keys_never_system_roles(demo: Catalog) -> None:
     assert demo.gate("beta_approved").approver_roles == ["product", "pmm", "cs"]
     assert {r.key for r in demo.lifecycle.roles} == {"pmm", "product", "cs", "support", "launch_owner"}
     assert demo.gate("monthly_release").release_gate is True
+
+
+def test_the_dev_users_hold_exactly_the_demo_catalogs_roles(demo: Catalog) -> None:
+    """One dev user per demo-catalog role, so a sign-in can approve at every gate. When S11 replaces the
+    roles, `config/dev_users.yaml` follows."""
+    seeds = load_dev_users(REPO_ROOT / "config" / "dev_users.yaml")
+    held = {role for seed in seeds for role in seed.roles} - SYSTEM_ROLES
+    assert held == {role.key for role in demo.lifecycle.roles}
+    assert all(len(seed.roles) == 1 for seed in seeds)  # one role each: a dev user is one role's person

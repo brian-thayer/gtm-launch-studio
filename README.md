@@ -95,6 +95,7 @@ cd ../frontend && npm run gen:api       # writes src/api/schema.d.ts
 ```powershell
 powershell -File scripts/dev.ps1          # API, worker and web, each in its own window
 powershell -File scripts/dev.ps1 -Stop    # stop them
+powershell -File scripts/dev.ps1 -Catalog fixtures/demo/catalog   # pick the catalog (default: gtm_catalog/ once it has a lifecycle.yaml, else the demo one)
 ```
 
 It refuses to start if ports 8000 or 5173 are in use, migrates the database and seeds the demo users, waits until the frontend can reach the API, then prints the URLs. Open http://localhost:5173 and pick a demo user on the login page; the home page then shows an "API: ok" badge when the whole chain works. `uv` doesn't have to be on PATH: the script finds it in `%APPDATA%\Python\Python3*\Scripts`.

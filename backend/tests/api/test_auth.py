@@ -7,6 +7,7 @@ from fastapi import APIRouter, Depends, FastAPI
 from fastapi.dependencies.models import Dependant
 from fastapi.testclient import TestClient
 from pydantic import SecretStr, ValidationError
+from sqlalchemy import Engine
 from structlog.testing import capture_logs
 
 from gtm_studio.api.app import create_app
@@ -79,7 +80,7 @@ def test_options_lists_the_seeded_users_without_a_session(client: TestClient, se
     body = client.get("/api/auth/options").json()
     assert body["provider"] == "dev"
     users = {u["display_name"]: u for u in body["dev_users"]}
-    assert len(users) == 5
+    assert len(users) == 7
     assert users["Avery Admin"]["roles"] == ["admin"]
     assert set(users["Avery Admin"]) == {"id", "display_name", "roles"}  # no email, no flags
 
@@ -97,6 +98,7 @@ def test_login_me_and_logout(client: TestClient, seeded: SeedSummary) -> None:
         "email": "priya.pmm@example.test",
         "display_name": "Priya Marketing",
         "roles": ["pmm"],
+        "role_info": [{"key": "pmm", "label": "pmm", "kind": "approver"}],  # the dev seed's label is the key
         "permissions": [
             "asset:generate",
             "asset:review",
@@ -231,7 +233,7 @@ def test_require_gives_403_when_the_permission_is_missing(
 
     @router.get("/audit", response_model=Me)
     def audit(actor: Annotated[Actor, Depends(require(Permission.AUDIT_READ))]) -> Me:
-        return Me.from_actor(actor)
+        return Me.from_actor(actor, [])
 
     app.include_router(router)
 
@@ -355,7 +357,9 @@ def test_secrets_are_not_shown_in_a_repr() -> None:
         assert secret not in str(s)
 
 
-def test_the_built_in_secret_logs_a_warning_when_serving_in_dev(settings: Settings) -> None:
+def test_the_built_in_secret_logs_a_warning_when_serving_in_dev(
+    settings: Settings, migrated_engine: Engine
+) -> None:
     def warnings_for(s: Settings) -> list[str]:
         with capture_logs() as logs, TestClient(create_app(s)):
             pass

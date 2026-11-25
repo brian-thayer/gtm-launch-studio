@@ -164,6 +164,109 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/catalog": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Overview
+         * @description The loaded catalog: version, issues, roles, gates, tiers, triggers and a summary of each asset type.
+         */
+        get: operations["catalog_overview"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/catalog/asset-types/{key}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Asset Type
+         * @description One asset type: its spec, prompt, rubric, gold examples and who may approve it.
+         */
+        get: operations["catalog_asset_type"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/catalog/brand": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Brand
+         * @description Voice, claims and legal guidance, terminology and the visual identity.
+         */
+        get: operations["catalog_brand"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/catalog/matrix": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Matrix
+         * @description Tiers (biggest first) by gates (in order): the core assets in each cell, plus each tier's optional
+         *     assets and triggers. Computed by the backend; the UI only renders it.
+         */
+        get: operations["catalog_matrix"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/catalog/reload": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Reload
+         * @description Read the catalog files again. Valid files replace the loaded catalog (and sync the approver roles).
+         *     Files with errors change nothing: the response is a 409 listing every issue. Either way it is audited.
+         *     This reloads the process that served the request only.
+         */
+        post: operations["catalog_reload"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/health": {
         parameters: {
             query?: never;
@@ -229,6 +332,98 @@ export interface components {
             /** Next Cursor */
             next_cursor: string | null;
         };
+        /** AssetRefOut */
+        AssetRefOut: {
+            /** Key */
+            key: string;
+            /** Name */
+            name: string;
+        };
+        /** AssetTypeResponse */
+        AssetTypeResponse: {
+            /** Approver Roles */
+            approver_roles: string[];
+            /** Examples */
+            examples: components["schemas"]["GoldExample"][];
+            /** Prompt Md */
+            prompt_md: string;
+            rubric: components["schemas"]["RubricOut"];
+            spec: components["schemas"]["AssetTypeSpec"];
+        };
+        /** AssetTypeSpec */
+        AssetTypeSpec: {
+            /** Approver Roles */
+            approver_roles?: string[] | null;
+            /**
+             * Audience
+             * @enum {string}
+             */
+            audience: "internal" | "external";
+            /** Decides */
+            decides?: "tier" | null;
+            /**
+             * Depends On
+             * @default []
+             */
+            depends_on: string[];
+            /**
+             * Effort
+             * @default medium
+             * @enum {string}
+             */
+            effort: "low" | "medium" | "high" | "xhigh" | "max";
+            /** Family */
+            family: string;
+            /** Formats */
+            formats: string[];
+            /**
+             * Foundation
+             * @default false
+             */
+            foundation: boolean;
+            /** Gate */
+            gate: string;
+            /** Key */
+            key: string;
+            /** Length */
+            length?: {
+                [key: string]: number;
+            } | null;
+            /** Name */
+            name: string;
+            /**
+             * Required Context
+             * @default []
+             */
+            required_context: string[];
+            /**
+             * Route
+             * @default writer
+             */
+            route: string;
+        };
+        /** AssetTypeSummary */
+        AssetTypeSummary: {
+            /**
+             * Audience
+             * @enum {string}
+             */
+            audience: "internal" | "external";
+            /** Decides */
+            decides: "tier" | null;
+            /** Example Count */
+            example_count: number;
+            /** Family */
+            family: string;
+            /** Foundation */
+            foundation: boolean;
+            /** Gate */
+            gate: string;
+            /** Key */
+            key: string;
+            /** Name */
+            name: string;
+        };
         /**
          * AuthOptions
          * @description What the login page shows. ``dev_users`` is filled only for the dev provider.
@@ -241,6 +436,38 @@ export interface components {
              * @enum {string}
              */
             provider: "dev" | "oidc";
+        };
+        /** Brand */
+        Brand: {
+            /** Claims Md */
+            claims_md: string;
+            /** Legal Md */
+            legal_md: string;
+            terminology: components["schemas"]["Terminology"];
+            visual: components["schemas"]["Visual"];
+            /** Voice Md */
+            voice_md: string;
+        };
+        /** CatalogResponse */
+        CatalogResponse: {
+            /** Asset Types */
+            asset_types: components["schemas"]["AssetTypeSummary"][];
+            /** Gates */
+            gates: components["schemas"]["Gate"][];
+            issues: components["schemas"]["IssuesOut"];
+            /**
+             * Loaded At
+             * Format: date-time
+             */
+            loaded_at: string;
+            /** Roles */
+            roles: components["schemas"]["RoleDef"][];
+            /** Tiers */
+            tiers: components["schemas"]["TierOut"][];
+            /** Triggers */
+            triggers: components["schemas"]["Trigger"][];
+            /** Version Hash */
+            version_hash: string;
         };
         /** DevLoginRequest */
         DevLoginRequest: {
@@ -256,6 +483,50 @@ export interface components {
             /** Roles */
             roles: string[];
         };
+        /** Gate */
+        Gate: {
+            /** Approver Roles */
+            approver_roles: string[];
+            /** Color */
+            color?: string | null;
+            /** Key */
+            key: string;
+            /** Label */
+            label: string;
+            /** Order */
+            order: number;
+            /**
+             * Release Gate
+             * @default false
+             */
+            release_gate: boolean;
+            /** Short */
+            short: string;
+        };
+        /** GoldExample */
+        GoldExample: {
+            /** Body Md */
+            body_md: string;
+            /** Context Summary */
+            context_summary: string;
+            /** Redacted */
+            redacted: boolean;
+            /**
+             * Redactions
+             * @default []
+             */
+            redactions: string[];
+            /** Slug */
+            slug: string;
+            /** Source */
+            source: string;
+            /** Tier */
+            tier?: string | null;
+            /** Title */
+            title: string;
+            /** Why Good */
+            why_good: string[];
+        };
         /** HTTPValidationError */
         HTTPValidationError: {
             /** Detail */
@@ -263,6 +534,13 @@ export interface components {
         };
         /** HealthResponse */
         HealthResponse: {
+            /**
+             * Catalog
+             * @enum {string}
+             */
+            catalog: "ok" | "missing";
+            /** Catalog Version */
+            catalog_version: string | null;
             /**
              * Db
              * @enum {string}
@@ -281,6 +559,74 @@ export interface components {
             /** Version */
             version: string;
         };
+        /**
+         * Issue
+         * @description One problem found in a catalog. ``where`` is catalog-relative, e.g. ``tiers.yaml: tiers[t1].core``.
+         */
+        Issue: {
+            /**
+             * Level
+             * @enum {string}
+             */
+            level: "error" | "warning";
+            /** Message */
+            message: string;
+            /** Where */
+            where: string;
+        };
+        /** IssuesOut */
+        IssuesOut: {
+            /** Errors */
+            errors: number;
+            /** Items */
+            items: components["schemas"]["Issue"][];
+            /** Todo Count */
+            todo_count: number;
+            /** Warnings */
+            warnings: number;
+        };
+        /** MatrixGateOut */
+        MatrixGateOut: {
+            /** Key */
+            key: string;
+            /** Short */
+            short: string;
+        };
+        /** MatrixResponse */
+        MatrixResponse: {
+            /** Gates */
+            gates: components["schemas"]["MatrixGateOut"][];
+            /** Rows */
+            rows: components["schemas"]["MatrixRowOut"][];
+            /** Undefined Assets */
+            undefined_assets: string[];
+        };
+        /** MatrixRowOut */
+        MatrixRowOut: {
+            /** Cells */
+            cells: components["schemas"]["AssetRefOut"][][];
+            /** Optional */
+            optional: components["schemas"]["AssetRefOut"][];
+            tier: components["schemas"]["MatrixTierOut"];
+            /** Triggers */
+            triggers: components["schemas"]["MatrixTriggerOut"][];
+        };
+        /** MatrixTierOut */
+        MatrixTierOut: {
+            /** Key */
+            key: string;
+            /** Label */
+            label: string;
+        };
+        /** MatrixTriggerOut */
+        MatrixTriggerOut: {
+            /** Assets */
+            assets: components["schemas"]["AssetRefOut"][];
+            /** Key */
+            key: string;
+            /** Label */
+            label: string;
+        };
         /** Me */
         Me: {
             /** Display Name */
@@ -291,6 +637,8 @@ export interface components {
             id: string;
             /** Permissions */
             permissions: components["schemas"]["Permission"][];
+            /** Role Info */
+            role_info: components["schemas"]["RoleInfo"][];
             /** Roles */
             roles: string[];
         };
@@ -299,6 +647,151 @@ export interface components {
          * @enum {string}
          */
         Permission: "solution:read" | "context:write" | "import:run" | "asset:generate" | "asset:review" | "audit:read" | "catalog:read" | "catalog:admin" | "user:admin";
+        /** PreferredTerm */
+        PreferredTerm: {
+            /** Avoid */
+            avoid: string[];
+            /** Use */
+            use: string;
+        };
+        /** ProductName */
+        ProductName: {
+            /** Name */
+            name: string;
+            /**
+             * Never
+             * @default []
+             */
+            never: string[];
+            /**
+             * Rules
+             * @default
+             */
+            rules: string;
+        };
+        /** ReloadResponse */
+        ReloadResponse: {
+            /** Issues */
+            issues: components["schemas"]["Issue"][];
+            /** New Hash */
+            new_hash: string | null;
+            /** Ok */
+            ok: boolean;
+            /** Old Hash */
+            old_hash: string | null;
+        };
+        /** RoleDef */
+        RoleDef: {
+            /** Key */
+            key: string;
+            /** Label */
+            label: string;
+        };
+        /**
+         * RoleInfo
+         * @description A role the user holds, as the roles table describes it. ``kind`` tells the UI how to show it.
+         */
+        RoleInfo: {
+            /** Key */
+            key: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "system" | "approver";
+            /** Label */
+            label: string;
+        };
+        /** RubricCriterion */
+        RubricCriterion: {
+            /** Body Md */
+            body_md: string;
+            /** Key */
+            key: string;
+            /** Title */
+            title: string;
+        };
+        /** RubricOut */
+        RubricOut: {
+            /** Criteria */
+            criteria: components["schemas"]["RubricCriterion"][];
+            /** Pass Threshold */
+            pass_threshold: number;
+        };
+        /** Terminology */
+        Terminology: {
+            /**
+             * Banned External
+             * @default []
+             */
+            banned_external: string[];
+            /**
+             * Preferred
+             * @default []
+             */
+            preferred: components["schemas"]["PreferredTerm"][];
+            /**
+             * Product Names
+             * @default []
+             */
+            product_names: components["schemas"]["ProductName"][];
+        };
+        /** TierCriterion */
+        TierCriterion: {
+            /** Description */
+            description: string;
+            /** Key */
+            key: string;
+            /** Label */
+            label: string;
+        };
+        /** TierOut */
+        TierOut: {
+            /** Channels */
+            channels: string[];
+            /** Criteria */
+            criteria: components["schemas"]["TierCriterion"][];
+            /** Description */
+            description: string;
+            /** Examples */
+            examples: string[];
+            /** Key */
+            key: string;
+            /** Label */
+            label: string;
+            /** Rank */
+            rank: number;
+            timing: components["schemas"]["TimingOut"] | null;
+        };
+        /**
+         * TimingOut
+         * @description Planning context, never an approval gate. Offsets are signed days from the anchor.
+         */
+        TimingOut: {
+            /** Anchor */
+            anchor: string;
+            /** Anchor Label */
+            anchor_label: string;
+            /** Core Due Days */
+            core_due_days: number | null;
+            /** Plan Start Days */
+            plan_start_days: number | null;
+        };
+        /** Trigger */
+        Trigger: {
+            /** Assets */
+            assets: string[];
+            /** Context Key */
+            context_key?: string | null;
+            /** Description */
+            description: string;
+            /** Key */
+            key: string;
+            /** Label */
+            label: string;
+            /** Tiers */
+            tiers?: string[] | null;
+        };
         /** ValidationError */
         ValidationError: {
             /** Context */
@@ -311,6 +804,29 @@ export interface components {
             msg: string;
             /** Error Type */
             type: string;
+        };
+        /** Visual */
+        Visual: {
+            /** Colors */
+            colors: {
+                [key: string]: string;
+            };
+            /**
+             * Fonts
+             * @default {}
+             */
+            fonts: {
+                [key: string]: string;
+            };
+            /** Logo */
+            logo?: string | null;
+            /**
+             * Slide
+             * @default {}
+             */
+            slide: {
+                [key: string]: unknown;
+            };
         };
     };
     responses: never;
@@ -553,6 +1069,154 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AuthOptions"];
+                };
+            };
+        };
+    };
+    catalog_overview: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CatalogResponse"];
+                };
+            };
+            /** @description No catalog is loaded (`no catalog loaded`). */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    catalog_asset_type: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                key: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AssetTypeResponse"];
+                };
+            };
+            /** @description No catalog is loaded, or it has no such asset type. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    catalog_brand: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Brand"];
+                };
+            };
+            /** @description No catalog is loaded (`no catalog loaded`). */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    catalog_matrix: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MatrixResponse"];
+                };
+            };
+            /** @description No catalog is loaded (`no catalog loaded`). */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    catalog_reload: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReloadResponse"];
+                };
+            };
+            /** @description The files have errors: the old catalog stays. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReloadResponse"];
                 };
             };
         };

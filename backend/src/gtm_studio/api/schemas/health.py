@@ -10,3 +10,5 @@ class HealthResponse(BaseModel):
     version: str
     env: Literal["dev", "test", "production"]
     db: Literal["ok", "error"]
+    catalog: Literal["ok", "missing"]
+    catalog_version: str | None

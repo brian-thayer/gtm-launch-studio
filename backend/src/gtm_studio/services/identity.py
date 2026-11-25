@@ -16,6 +16,7 @@ from gtm_studio.domain.identity import (
     Actor,
     AuthProviderName,
     DevUserSeed,
+    RoleRecord,
     RoleSource,
     UserRecord,
     check_role_key,
@@ -128,6 +129,12 @@ class IdentityService:
         with self._uow_factory() as uow:
             user = uow.identity.get_user(user_id)
         return user.to_actor() if user is not None and user.is_active else None
+
+    def describe_roles(self, role_keys: Collection[str]) -> list[RoleRecord]:
+        """The role rows for these keys (label, source, active), by key. A key with no row is left out."""
+        wanted = set(role_keys)
+        with self._uow_factory() as uow:
+            return [role for role in uow.identity.list_roles() if role.key in wanted]
 
     def list_active_users(self) -> list[UserRecord]:
         with self._uow_factory() as uow:

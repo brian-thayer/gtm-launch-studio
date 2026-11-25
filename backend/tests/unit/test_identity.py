@@ -7,6 +7,7 @@ from gtm_studio.domain.identity import (
     can_approve,
     check_role_key,
     permissions_for,
+    role_kind,
 )
 
 
@@ -16,6 +17,14 @@ def _actor(*roles: str) -> Actor:
 
 def test_system_roles() -> None:
     assert sorted(SYSTEM_ROLES) == ["admin", "viewer"]
+
+
+@pytest.mark.parametrize(
+    ("role", "kind"),
+    [("admin", "system"), ("viewer", "system"), ("pmm", "approver"), ("role_a", "approver")],
+)
+def test_role_kind_is_system_only_for_the_two_system_roles(role: str, kind: str) -> None:
+    assert role_kind(role) == kind
 
 
 def test_admin_has_every_permission() -> None:

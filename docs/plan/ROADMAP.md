@@ -34,7 +34,7 @@ Order: run the code steps first (S10a → S10 → S10b → S15 → S15b), becaus
 | S10a | Backend conventions from the M1 review (errors, uow dependency, clock, role key, audited seeding, audit index, template test DB) | done | S09 | |
 | S10 | Catalog models (core / optional / triggers / timing), loader, version hash, `gtm catalog show`, `catalog_min` | done | S10a | |
 | S10b | Catalog validator, `gtm catalog validate`, demo catalog | done | S10 | |
-| S15 | Catalog in the app: service, role sync, read API, admin reload, "no catalog" state | todo | S10b | |
+| S15 | Catalog in the app: service, role sync, read API, admin reload, "no catalog" state | done | S10b | |
 | S15b | Catalog page; login follow-ups (SSO `next`, error messages, server-error page, `safeNext` parity) | todo | S15 | approve `npm install react-markdown` |
 | S11 | Ingest tier framework and lifecycle (`/ingest-tier-framework`) | todo | S10b | **lifecycle gates and approvers, answers, sign-off** |
 | S12 | Ingest brand guidelines (`/ingest-brand-guidelines`) | todo | S10b | **review terminology and legal, logo decision** |
@@ -95,6 +95,7 @@ Order: run the code steps first (S10a → S10 → S10b → S15 → S15b), becaus
 | S47 | `docs/security.md`, `docs/hosting.md` hardening checklist, final security review |
 
 ## Backlog (unscheduled)
+- **Concurrent role inserts:** two processes syncing the same new role key at once (several API processes starting together, or a reload racing an OIDC sign-in) can raise an `IntegrityError` in `put_role` / `ensure_role`. Retry on conflict, with the multi-process hosting item below (S33 covers `IntegrityError` → `ConflictError`).
 - **Catalog reload across processes** for hosting with several API processes: store the active `version_hash` in the database and have each process reload when it differs (S15 reloads only the process that served the request; S33 covers the worker).
 - Activity page: the actor filter becomes a select once an endpoint lists users (S08 follow-up).
 - Type-aware ESLint once there is more feature code (S03 follow-up).

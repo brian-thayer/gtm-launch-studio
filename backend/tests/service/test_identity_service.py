@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session
 from gtm_studio.auth.dev_users import load_dev_users
 from gtm_studio.db.models.identity import Role, User, UserRole
 from gtm_studio.domain.audit import SYSTEM_ACTOR_DISPLAY, AuditFilters
-from gtm_studio.domain.identity import UserRecord
+from gtm_studio.domain.identity import RoleRecord, UserRecord
 from gtm_studio.services.activity import ActivityService
 from gtm_studio.services.identity import IdentityService, SeedError, SeedSummary
 from gtm_studio.services.ports import UnitOfWorkFactory
@@ -40,7 +40,7 @@ def _user(**overrides: object) -> dict[str, object]:
 def test_seeding_creates_the_demo_users_and_roles(
     uow_factory: UnitOfWorkFactory, seeded: SeedSummary
 ) -> None:
-    assert seeded == SeedSummary(users_created=5, users_updated=0, users_unchanged=0, roles_created=3)
+    assert seeded == SeedSummary(users_created=7, users_updated=0, users_unchanged=0, roles_created=5)
     actor = IdentityService(uow_factory).get_actor(ADMIN_ID)
     assert actor is not None
     assert (actor.email, actor.display_name, actor.roles) == (
@@ -66,13 +66,15 @@ def test_seeded_roles_are_marked_dev_seed(migrated_engine: Engine, seeded: SeedS
         "pmm": "dev_seed",
         "product": "dev_seed",
         "cs": "dev_seed",
+        "support": "dev_seed",
+        "launch_owner": "dev_seed",
     }
     assert grants == {"dev_seed"}
 
 
 def test_seeding_twice_changes_nothing(uow_factory: UnitOfWorkFactory, seeded: SeedSummary) -> None:
     again = IdentityService(uow_factory).seed_dev_users(load_dev_users(DEV_USERS))
-    assert again == SeedSummary(users_created=0, users_updated=0, users_unchanged=5, roles_created=0)
+    assert again == SeedSummary(users_created=0, users_updated=0, users_unchanged=7, roles_created=0)
 
 
 def test_seeding_updates_a_changed_user_and_leaves_others_alone(
@@ -240,7 +242,7 @@ def test_seeding_a_fresh_database_audits_each_user_and_their_roles(
 ) -> None:
     events = _seed_events(uow_factory)
     seeded_ids = [entity for action, entity, _ in events if action == "user.seeded"]
-    assert len(seeded_ids) == 5
+    assert len(seeded_ids) == 7
     assert {details["provider"] for action, _, details in events if action == "user.seeded"} == {"dev"}
     roles_set = {entity: details for action, entity, details in events if action == "user.roles_set"}
     assert set(roles_set) == set(seeded_ids)
@@ -289,3 +291,33 @@ def test_user_exists_sees_inactive_users_too(uow_factory: UnitOfWorkFactory, see
         uow.identity.upsert_user(replace(record, is_active=False))
     assert service.user_exists(PMM_ID)
     assert not service.user_exists("99999999-9999-4999-8999-999999999999")
+
+
+# ------------------------------------------------------- roles: list_roles, put_role, describe_roles
+def test_put_role_creates_overwrites_and_reports_whether_anything_changed(
+    uow_factory: UnitOfWorkFactory,
+) -> None:
+    with uow_factory() as uow:
+        assert uow.identity.put_role("r1", "R one", source="oidc", active=False) is True
+        assert uow.identity.put_role("r1", "R one", source="oidc", active=False) is False  # nothing differs
+        assert uow.identity.put_role("r1", "R 1", source="catalog", active=True) is True  # all three change
+        # ensure_role, in contrast, leaves an existing role alone
+        assert uow.identity.ensure_role("r1", "other", source="dev_seed", active=False) is False
+    with uow_factory() as uow:
+        roles = {role.key: role for role in uow.identity.list_roles()}
+    assert roles["r1"] == RoleRecord(key="r1", label="R 1", source="catalog", active=True)
+    assert list(roles) == sorted(roles)  # ordered by key
+    assert {"admin", "viewer"} <= roles.keys()  # the system roles are rows too
+
+
+def test_describe_roles_gives_the_rows_for_the_keys_asked_including_inactive_ones(
+    uow_factory: UnitOfWorkFactory, seeded: SeedSummary
+) -> None:
+    with uow_factory() as uow:
+        uow.identity.put_role("off", "Switched off", source="catalog", active=False)
+    described = IdentityService(uow_factory).describe_roles({"viewer", "pmm", "off", "no_such_role"})
+    assert [(r.key, r.label, r.source, r.active) for r in described] == [
+        ("off", "Switched off", "catalog", False),
+        ("pmm", "pmm", "dev_seed", True),
+        ("viewer", "Viewer", "system", True),  # the migration labels the system roles
+    ]

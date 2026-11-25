@@ -1,6 +1,6 @@
 # S15: Catalog in the running app: service, role sync, read API, admin reload
 
-Status: todo
+Status: done
 Milestone: M2
 Depends on: S10b. Works with the demo catalog, so it doesn't wait for S11–S14.
 Human in the loop: no
@@ -120,3 +120,19 @@ Manual check: run `powershell -File scripts/dev.ps1` (it should print that it ch
 
 ## Notes
 - **From S09:** an OIDC sign-in creates a mapped role that nothing declares yet as `source=oidc, active=false`, so a typo in `config/oidc_roles.yaml` can't grant access. `sync_roles` turns such a row into `source=catalog, active=true` when the catalog declares the key (covered by the acceptance test above). A catalog role that is later removed becomes inactive again, and its grant rows stay for history.
+- **Deviations (S15 session):**
+  - `CatalogSource` has a third method, `todo_count()`. The API reports `todo_count`, and `check()` returns only issues, so the service had no honest source for it (parsing the warning text would couple it to a message). `FileCatalogSource` sums `count_todos`.
+  - **Order of a reload:** the `catalog.reloaded` event and the role sync commit in one unit of work *before* the swap (the card said swap, then sync). If the database fails, nothing has changed. A separate `_reload_lock` serialises reloads, so two at once can't leave the roles matching a different catalog from the one served; readers take no lock. The swap itself still happens under `_lock`.
+  - `IdentityService.describe_roles(keys)` is new: `Me.role_info` needs the labels from the roles table, and a router may not read the database.
+  - `RoleSyncResult.relabelled` also holds an active role whose *source* changed (a `dev_seed` or `oidc` row taken over with an equal label), because the card's four lists had no other place for it.
+  - A reload with a catalog that *loads* but has errors reports its real `new_hash`; `new_hash` is null only when the files don't load (or there are none).
+  - The asset-type 404 says `no such asset type` and doesn't repeat the key (the S10 follow-up: `detail` reaches the client as it is), and the path parameter is limited to 100 characters (422 beyond that).
+  - Response schemas reuse the domain's frozen models where the API shows them as they are (`Gate`, `Trigger`, `Brand`, `AssetTypeSpec`, `GoldExample`, `Issue`). A change to one of them shows up in `openapi.json`, and the contract test catches it.
+  - `config/dev_users.yaml` gained Sam Support (`support`) and Lee Launch Owner (`launch_owner`): seven users, so the counts in `test_auth`, `test_identity_service` and `test_seed_cli` went from 5 to 7. `tests/api/test_activity.py` used `catalog` as a made-up entity type and now uses `release` (the app writes real `catalog.*` events); the OIDC tests' `_events` helper ignores `catalog.*` events (start-up sync). Tests that start the app (`test_app`, `test_auth`, `test_health`) use `no_catalog_settings` or `migrated_engine`.
+  - Size: about 1,700 lines of source and tests against about 550 (about 700 of them are the two new test files), plus about 2,000 generated lines in `openapi.json` and `schema.d.ts`.
+- **Follow-ups:**
+  - The API now needs a migrated database to start whenever a catalog is present: an unmigrated one fails with a raw `no such table: roles`. Catch it in the lifespan with a "run `gtm db upgrade`" message (documented in `backend/CLAUDE.md`).
+  - `roles.label` is `String(100)` but `RoleDef.label` has no limit and the validator doesn't check it: SQLite accepts a longer label, Postgres would fail the start-up sync. Add a `catalog_rules` check (S10b territory).
+  - `check()` and `todo_count()` read the files twice, so the count can disagree with the issues if a file changes in between. Have `check()` return the counts too when S11 touches the source.
+  - `CatalogResponse.from_loaded` resolves the timing anchor's label from `context_keys` in the schema layer. It is presentation, not tier or gate logic; move it into a service view if more of this appears.
+  - Still open from the card: reload applies to the process that served it (S33 for the worker; the Backlog item for several API processes).
